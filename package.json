@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
+    "dev": "cd exam-quiz && npm run dev",
+    "build": "cd exam-quiz && npm ci --no-audit --no-fund && npm run build && cd .. && rm -rf dist && cp -r exam-quiz/dist dist",
+    "preview": "cd exam-quiz && npm run preview",
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
