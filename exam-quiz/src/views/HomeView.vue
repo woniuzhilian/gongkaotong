@@ -13,7 +13,7 @@
 
     <!-- 导航按钮 -->
     <div class="nav-buttons">
-      <button class="nav-btn log" @click="goChangelog">
+      <button class="nav-btn log" @click="goChangelog" v-if="step === 1">
         <span class="nav-icon">📋</span>
         <span>更新日志</span>
       </button>
