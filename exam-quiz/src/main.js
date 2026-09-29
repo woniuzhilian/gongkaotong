@@ -13,6 +13,7 @@ const routes = [
   { path: '/quiz', component: () => import('./views/QuizView.vue') },
   { path: '/wrongbook', component: () => import('./views/WrongBookView.vue') },
   { path: '/favorites', component: () => import('./views/FavoritesView.vue') },
+  { path: '/changelog', component: () => import('./views/ChangelogView.vue') },
   { path: '/result', component: () => import('./views/ResultView.vue') }
 ]
 

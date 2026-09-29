@@ -13,6 +13,10 @@
 
     <!-- 导航按钮 -->
     <div class="nav-buttons">
+      <button class="nav-btn log" @click="goChangelog">
+        <span class="nav-icon">📋</span>
+        <span>更新日志</span>
+      </button>
       <button class="nav-btn fav" @click="goFavorites">
         <span class="nav-icon">⭐</span>
         <span>我的收藏</span>
@@ -252,6 +256,10 @@ function goFavorites() {
   router.push('/favorites')
 }
 
+function goChangelog() {
+  router.push('/changelog')
+}
+
 function resumeQuiz() {
   if (!savedProgress.value) return
   router.push({
@@ -346,6 +354,7 @@ function goHome() {
 .nav-buttons {
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
   margin-bottom: 20px;
 }
 
@@ -374,6 +383,16 @@ function goHome() {
 
 .nav-btn.fav:hover {
   background: #fff1b8;
+}
+
+.nav-btn.log {
+  background: #f0f5ff;
+  border-color: #adc6ff;
+  color: #2f54eb;
+}
+
+.nav-btn.log:hover {
+  background: #d6e4ff;
 }
 
 .fav-count {

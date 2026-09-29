@@ -14,9 +14,10 @@
         <div class="update-icon">🎉</div>
         <h3 class="update-title">发现新版本</h3>
         <p class="update-version" v-if="updateInfo.version">v{{ updateInfo.version }}</p>
-        <ul class="update-notes" v-if="updateInfo.notes && updateInfo.notes.length">
-          <li v-for="(note, i) in updateInfo.notes" :key="i">{{ note }}</li>
+        <ul class="update-notes" v-if="updateInfo.summary && updateInfo.summary.length">
+          <li v-for="(note, i) in updateInfo.summary" :key="i">{{ note }}</li>
         </ul>
+        <p class="update-more">查看详细更新内容：首页 → 更新日志</p>
         <div class="update-actions">
           <button class="update-later" @click="dismissUpdate">稍后再说</button>
           <button class="update-refresh" @click="applyUpdate">立即刷新</button>
@@ -220,7 +221,7 @@ async function logout() {
 }
 
 .update-notes {
-  margin: 0 0 18px;
+  margin: 0 0 10px;
   padding: 12px 14px 12px 30px;
   background: #f7f9fc;
   border-radius: 8px;
@@ -230,6 +231,12 @@ async function logout() {
   line-height: 1.8;
   max-height: 40vh;
   overflow-y: auto;
+}
+
+.update-more {
+  margin: 0 0 16px;
+  font-size: 12px;
+  color: #999;
 }
 
 .update-actions {
