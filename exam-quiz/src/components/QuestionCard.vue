@@ -2,11 +2,16 @@
   <div class="question-card">
     <div class="question-header">
       <span class="q-num">{{ question.year }}-{{ question.yearQnum || question.id }}</span>
-      <span class="q-progress">{{ currentIndex + 1 }} / {{ total }}</span>
+      <button
+        class="fav-btn"
+        :class="{ active: isFav }"
+        @click="$emit('toggle-favorite')"
+        :title="isFav ? '取消收藏' : '收藏'"
+      >{{ isFav ? '★ 已收藏' : '☆ 收藏' }}</button>
       <button class="report-btn" @click="showReportModal = true" title="报错">⚠️ 报错</button>
     </div>
 
-    <div class="question-content" v-html="renderedQuestion"></div>
+    <div class="question-content" v-html="renderedQuestion" @click="onContentClick"></div>
 
     <div class="options">
       <button
@@ -23,7 +28,7 @@
         @click="selectOption(opt)"
       >
         <span class="opt-label">{{ opt }}</span>
-        <span class="opt-content" v-html="renderOption(opt)"></span>
+        <span class="opt-content" v-html="renderOption(opt)" @click="onContentClick"></span>
       </button>
     </div>
 
@@ -58,6 +63,20 @@
         </button>
       </div>
     </div>
+    <!-- 图片放大遮罩：手机双指缩放 / 电脑滚轮缩放 -->
+    <div
+      class="img-zoom-mask"
+      v-if="zoomSrc"
+      @click.self="closeZoom"
+      @wheel.prevent="onZoomWheel"
+      @touchstart="onZoomTouchStart"
+      @touchmove.prevent="onZoomTouchMove"
+      @touchend="onZoomTouchEnd"
+    >
+      <img :src="zoomSrc" :style="{ transform: `scale(${zoomScale})` }" draggable="false" />
+      <button class="zoom-close" @click="closeZoom">×</button>
+    </div>
+
     <!-- 报错反馈弹窗 -->
     <div class="report-mask" v-if="showReportModal" @click.self="showReportModal = false">
       <div class="report-modal">
@@ -101,10 +120,11 @@ const props = defineProps({
   currentIndex: { type: Number, default: 0 },
   total: { type: Number, default: 0 },
   locked: { type: Boolean, default: false },
-  initialAnswer: { type: String, default: '' }
+  initialAnswer: { type: String, default: '' },
+  isFav: { type: Boolean, default: false }
 })
 
-const emit = defineEmits(['submit', 'next', 'select', 'analysis'])
+const emit = defineEmits(['submit', 'next', 'select', 'analysis', 'toggle-favorite'])
 
 const selectedAnswer = ref(props.initialAnswer || '')
 const dontKnow = ref(false)
@@ -192,6 +212,57 @@ function toggleDontKnow() {
     selectedAnswer.value = ''
     emit('select', '')
   }
+}
+
+// ===== 配图缩放查看 =====
+const zoomSrc = ref('')
+const zoomScale = ref(1)
+let pinchStartDist = 0
+let pinchStartScale = 1
+
+function onContentClick(e) {
+  const img = e.target && e.target.closest ? e.target.closest('img') : null
+  if (!img || !img.src) return
+  zoomSrc.value = img.src
+  zoomScale.value = 1
+}
+
+function closeZoom() {
+  zoomSrc.value = ''
+  zoomScale.value = 1
+}
+
+// 电脑端：滚轮上拨放大、下拨缩小
+function onZoomWheel(e) {
+  const delta = e.deltaY > 0 ? -0.2 : 0.2
+  zoomScale.value = Math.min(8, Math.max(0.5, zoomScale.value + delta))
+}
+
+function touchDistance(e) {
+  const t = e.touches
+  if (t.length < 2) return 0
+  const dx = t[0].clientX - t[1].clientX
+  const dy = t[0].clientY - t[1].clientY
+  return Math.hypot(dx, dy)
+}
+
+// 手机端：双指捏合缩放
+function onZoomTouchStart(e) {
+  if (e.touches.length === 2) {
+    pinchStartDist = touchDistance(e)
+    pinchStartScale = zoomScale.value
+  }
+}
+
+function onZoomTouchMove(e) {
+  if (e.touches.length === 2 && pinchStartDist > 0) {
+    const d = touchDistance(e)
+    zoomScale.value = Math.min(8, Math.max(0.5, pinchStartScale * (d / pinchStartDist)))
+  }
+}
+
+function onZoomTouchEnd(e) {
+  if (e.touches.length < 2) pinchStartDist = 0
 }
 </script>
 
@@ -454,6 +525,7 @@ function toggleDontKnow() {
   /* 手机竖屏：「我不会」宽度为「提交」的 1/3 */
   .submit-area {
     display: flex;
+    flex-direction: row;
     align-items: stretch;
     gap: 10px;
   }
@@ -479,9 +551,35 @@ function toggleDontKnow() {
     flex: 1;
   }
 }
+/* 收藏按钮 */
+.fav-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid #e0e0e0;
+  font-size: 13px;
+  color: #999;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.fav-btn:hover {
+  background: #fffbe6;
+  color: #faad14;
+  border-color: #ffe58f;
+}
+
+.fav-btn.active {
+  background: #fffbe6;
+  color: #faad14;
+  border-color: #faad14;
+}
+
 /* 报错按钮 */
 .report-btn {
-  margin-left: auto;
+  margin-left: 0;
   flex-shrink: 0;
   background: none;
   border: 1px solid #e0e0e0;
@@ -637,5 +735,46 @@ function toggleDontKnow() {
 .report-submit:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* 图片放大遮罩 */
+.img-zoom-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  touch-action: none;
+}
+
+.img-zoom-mask img {
+  max-width: 92vw;
+  max-height: 92vh;
+  transition: transform 0.1s ease-out;
+  will-change: transform;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.zoom-close {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+  font-size: 24px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.zoom-close:hover {
+  background: rgba(255,255,255,0.4);
 }
 </style>

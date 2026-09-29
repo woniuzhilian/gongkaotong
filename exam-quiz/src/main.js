@@ -12,6 +12,7 @@ const routes = [
   { path: '/', component: () => import('./views/HomeView.vue') },
   { path: '/quiz', component: () => import('./views/QuizView.vue') },
   { path: '/wrongbook', component: () => import('./views/WrongBookView.vue') },
+  { path: '/favorites', component: () => import('./views/FavoritesView.vue') },
   { path: '/result', component: () => import('./views/ResultView.vue') }
 ]
 

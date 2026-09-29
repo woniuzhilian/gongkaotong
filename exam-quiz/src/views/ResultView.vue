@@ -71,7 +71,7 @@ import {
   makeSectionKey
 } from '../utils/quiz'
 import {
-  getSectionAnswers, getWrongBook, clearSectionProgress, clearSectionAnswers,
+  getSectionAnswers, getWrongBook, getFavorites, clearSectionProgress, clearSectionAnswers,
   removeWrong, saveSectionResult
 } from '../utils/storage'
 
@@ -117,6 +117,10 @@ function loadQuestions() {
   } else if (mode.value === 'wrong') {
     const wrong = getWrongBook()
     const ids = wrong[bigSubject.value] || []
+    questions.value = getQuestionsByIds(bigSubject.value, ids)
+  } else if (mode.value === 'fav') {
+    const fav = getFavorites()
+    const ids = fav[bigSubject.value] || []
     questions.value = getQuestionsByIds(bigSubject.value, ids)
   }
 }

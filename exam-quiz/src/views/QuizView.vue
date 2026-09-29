@@ -40,11 +40,13 @@
       :total="questions.length"
       :locked="isLocked"
       :initial-answer="currentUserAnswer"
+      :is-fav="currentIsFav"
       :is-last="currentIndex === questions.length - 1"
       @submit="handleSubmit"
       @next="handleNext"
       @select="handleSelect"
       @analysis="openAnalysis"
+      @toggle-favorite="toggleCurrentFavorite"
     />
 
     <!-- 底部导航 -->
@@ -107,7 +109,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import QuestionCard from '../components/QuestionCard.vue'
 import ResultModal from '../components/ResultModal.vue'
@@ -121,7 +123,7 @@ import {
 import {
   getSectionProgress, setProgress, clearSectionProgress,
   saveAnswer, getSectionAnswers, clearSectionAnswers,
-  addWrong, getWrongBook
+  addWrong, getWrongBook, getFavorites, isFavorite, toggleFavorite
 } from '../utils/storage'
 
 const route = useRoute()
@@ -151,9 +153,33 @@ const currentUserAnswer = computed(() => {
   return a === DONT_KNOW ? '' : a
 })
 
+// 当前题是否已收藏（favTick 用于切换后触发重算）
+const favTick = ref(0)
+const currentIsFav = computed(() => {
+  favTick.value
+  if (!currentQuestion.value) return false
+  return isFavorite(bigSubject.value, currentQuestion.value.id)
+})
+
+function toggleCurrentFavorite() {
+  if (!currentQuestion.value) return
+  toggleFavorite(bigSubject.value, currentQuestion.value.id)
+  favTick.value++
+}
+
 onMounted(() => {
   loadQuestions()
+  // 其他设备更新了收藏/错题等数据时，刷新当前题的收藏状态
+  window.addEventListener('cloud-data-updated', onCloudUpdate)
 })
+
+onUnmounted(() => {
+  window.removeEventListener('cloud-data-updated', onCloudUpdate)
+})
+
+function onCloudUpdate() {
+  favTick.value++
+}
 
 watch(() => route.query, () => {
   bigSubject.value = route.query.bigSubject || ''
@@ -172,6 +198,12 @@ function loadQuestions() {
     clearSectionAnswers(bigSubject.value, sectionKey.value)
     const wrong = getWrongBook()
     const ids = wrong[bigSubject.value] || []
+    questions.value = getQuestionsByIds(bigSubject.value, ids)
+  } else if (mode.value === 'fav') {
+    // 收藏练习模式
+    clearSectionAnswers(bigSubject.value, sectionKey.value)
+    const fav = getFavorites()
+    const ids = fav[bigSubject.value] || []
     questions.value = getQuestionsByIds(bigSubject.value, ids)
   }
 

@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="home-page">
     <!-- 顶部导航（step2和step3显示） -->
     <div class="top-nav" v-if="step > 1">
@@ -13,6 +13,11 @@
 
     <!-- 导航按钮 -->
     <div class="nav-buttons">
+      <button class="nav-btn fav" @click="goFavorites">
+        <span class="nav-icon">⭐</span>
+        <span>我的收藏</span>
+        <span class="fav-count" v-if="totalFav > 0">{{ totalFav }}题</span>
+      </button>
       <button class="nav-btn wrong" @click="goWrongBook">
         <span class="nav-icon">📝</span>
         <span>错题本</span>
@@ -109,7 +114,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getSmallSubjects, getYears, getQuestionsByBigSubject, makeSectionKey } from '../utils/quiz'
-import { getProgress, getWrongBook, clearAllQuizRecords, getSectionResult } from '../utils/storage'
+import { getProgress, getWrongBook, getFavorites, clearAllQuizRecords, getSectionResult } from '../utils/storage'
 
 const router = useRouter()
 
@@ -176,6 +181,12 @@ const totalWrong = computed(() => {
   return (wrong['公共基础']?.length || 0) + (wrong['专业基础']?.length || 0)
 })
 
+const totalFav = computed(() => {
+  refreshTick.value
+  const fav = getFavorites()
+  return (fav['公共基础']?.length || 0) + (fav['专业基础']?.length || 0)
+})
+
 const pubStats = computed(() => {
   const list = getQuestionsByBigSubject('公共基础')
   const years = new Set(list.map(q => q.year))
@@ -235,6 +246,10 @@ function startQuiz(item) {
 
 function goWrongBook() {
   router.push('/wrongbook')
+}
+
+function goFavorites() {
+  router.push('/favorites')
 }
 
 function resumeQuiz() {
@@ -349,6 +364,24 @@ function goHome() {
 
 .nav-btn:hover {
   background: #ffe7ba;
+}
+
+.nav-btn.fav {
+  background: #fffbe6;
+  border-color: #ffe58f;
+  color: #d48806;
+}
+
+.nav-btn.fav:hover {
+  background: #fff1b8;
+}
+
+.fav-count {
+  background: #faad14;
+  color: #fff;
+  font-size: 12px;
+  padding: 1px 8px;
+  border-radius: 10px;
 }
 
 .wrong-count {

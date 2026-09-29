@@ -7,6 +7,7 @@ const STORAGE_KEYS = {
   PROGRESS: 'exam_quiz_progress',      // 各板块进度map + lastActive
   ANSWERS: 'exam_quiz_answers',        // 答题记录
   WRONG: 'exam_quiz_wrong',            // 错题本
+  FAVORITES: 'exam_quiz_favorites',    // 收藏夹
   RESULTS: 'exam_quiz_results',        // 各板块最近一次完成结果（正确率）
   SETTINGS: 'exam_quiz_settings'       // 设置
 }
@@ -37,6 +38,7 @@ function notifyCloudSync() {
     progress: get(STORAGE_KEYS.PROGRESS, {}),
     answers: get(STORAGE_KEYS.ANSWERS, {}),
     wrong: get(STORAGE_KEYS.WRONG, {}),
+    favorites: get(STORAGE_KEYS.FAVORITES, {}),
     results: get(STORAGE_KEYS.RESULTS, {})
   }
   scheduleCloudSync(localData)
@@ -220,6 +222,55 @@ export function clearWrongBook(bigSubject) {
   notifyCloudSync()
 }
 
+// ===== 收藏夹 =====
+// 结构：{ "公共基础": [题目id数组], "专业基础": [题目id数组] }
+export function getFavorites() {
+  const stored = get(STORAGE_KEYS.FAVORITES, {})
+  return {
+    '公共基础': stored['公共基础'] || [],
+    '专业基础': stored['专业基础'] || []
+  }
+}
+
+export function isFavorite(bigSubject, questionId) {
+  const fav = getFavorites()
+  return fav[bigSubject] && fav[bigSubject].includes(questionId)
+}
+
+// 切换收藏状态，返回切换后是否为收藏
+export function toggleFavorite(bigSubject, questionId) {
+  const fav = getFavorites()
+  if (!fav[bigSubject]) fav[bigSubject] = []
+  const idx = fav[bigSubject].indexOf(questionId)
+  let added
+  if (idx >= 0) {
+    fav[bigSubject].splice(idx, 1)
+    added = false
+  } else {
+    fav[bigSubject].push(questionId)
+    added = true
+  }
+  set(STORAGE_KEYS.FAVORITES, fav)
+  notifyCloudSync()
+  return added
+}
+
+export function removeFavorite(bigSubject, questionId) {
+  const fav = getFavorites()
+  if (fav[bigSubject]) {
+    fav[bigSubject] = fav[bigSubject].filter(id => id !== questionId)
+    set(STORAGE_KEYS.FAVORITES, fav)
+    notifyCloudSync()
+  }
+}
+
+export function clearFavorites(bigSubject) {
+  const fav = getFavorites()
+  fav[bigSubject] = []
+  set(STORAGE_KEYS.FAVORITES, fav)
+  notifyCloudSync()
+}
+
 // ===== 云端同步（登录后调用）=====
 
 // 登录后从云端拉取数据，覆盖本地
@@ -230,6 +281,7 @@ export async function syncFromCloud() {
   if (cloud.progress) set(STORAGE_KEYS.PROGRESS, cloud.progress)
   if (cloud.answers) set(STORAGE_KEYS.ANSWERS, cloud.answers)
   if (cloud.wrong) set(STORAGE_KEYS.WRONG, cloud.wrong)
+  if (cloud.favorites) set(STORAGE_KEYS.FAVORITES, cloud.favorites)
   if (cloud.results) set(STORAGE_KEYS.RESULTS, cloud.results)
   return true
 }
@@ -241,6 +293,7 @@ export async function pushAllToCloud() {
     progress: get(STORAGE_KEYS.PROGRESS, {}),
     answers: get(STORAGE_KEYS.ANSWERS, {}),
     wrong: get(STORAGE_KEYS.WRONG, {}),
+    favorites: get(STORAGE_KEYS.FAVORITES, {}),
     results: get(STORAGE_KEYS.RESULTS, {})
   }
   await pushToCloud(localData)
@@ -251,5 +304,6 @@ export function clearLocalData() {
   localStorage.removeItem(STORAGE_KEYS.PROGRESS)
   localStorage.removeItem(STORAGE_KEYS.ANSWERS)
   localStorage.removeItem(STORAGE_KEYS.WRONG)
+  localStorage.removeItem(STORAGE_KEYS.FAVORITES)
   localStorage.removeItem(STORAGE_KEYS.RESULTS)
 }

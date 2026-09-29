@@ -1,4 +1,4 @@
-﻿// Supabase 连接封装 + 云端进度同步
+// Supabase 连接封装 + 云端进度同步
 import { createClient } from '@supabase/supabase-js'
 
 const SUPABASE_URL = 'https://ejpvwumcqjfutvcycevz.supabase.co'
@@ -123,14 +123,21 @@ export async function pushToCloud(localData) {
     progress: localData.progress || {},
     answers: localData.answers || {},
     wrong: localData.wrong || {},
+    favorites: localData.favorites || {},
     results: localData.results || {},
     updated_at: new Date().toISOString()
   }
 
   // upsert：存在就更新，不存在就插入
-  const { error } = await supabase
+  let { error } = await supabase
     .from('user_progress')
     .upsert(payload)
+
+  // 若数据库尚未有 favorites 列，去掉该字段重试，保证其余数据同步不受影响
+  if (error && String(error.message).includes('favorites')) {
+    const { favorites, ...rest } = payload
+    error = (await supabase.from('user_progress').upsert(rest)).error
+  }
   if (error) {
     console.error('云同步失败:', error.message)
   }
@@ -142,11 +149,22 @@ export async function pullFromCloud() {
   if (!session?.user) return null
   const userId = session.user.id
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('user_progress')
-    .select('progress, answers, wrong, results, updated_at')
+    .select('progress, answers, wrong, favorites, results, updated_at')
     .eq('id', userId)
     .single()
+
+  // 若 favorites 列尚不存在，降级为不含该字段的查询
+  if (error && String(error.message).includes('favorites')) {
+    const r2 = await supabase
+      .from('user_progress')
+      .select('progress, answers, wrong, results, updated_at')
+      .eq('id', userId)
+      .single()
+    data = r2.data
+    error = r2.error
+  }
 
   if (error) {
     // PGRST116 = 没有数据（新用户），不算错误
