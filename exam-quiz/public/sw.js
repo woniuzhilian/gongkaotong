@@ -1,5 +1,5 @@
 // Service Worker - PWA 离线缓存
-const CACHE_NAME = 'gongkaotong-v1'
+const CACHE_NAME = 'gongkaotong-v2'
 const ASSETS = [
   '/',
   '/index.html',
@@ -13,7 +13,14 @@ self.addEventListener('install', (event) => {
       return cache.addAll(ASSETS)
     })
   )
-  self.skipWaiting()
+  // 不自动 skipWaiting：新版本进入 waiting 状态，等用户点"立即刷新"后再激活
+})
+
+// 收到页面消息后才跳过等待并激活
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting()
+  }
 })
 
 // 激活时清理旧缓存

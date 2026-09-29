@@ -24,7 +24,24 @@
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js')
-          .then(() => console.log('PWA 已启用'))
+          .then((reg) => {
+            console.log('PWA 已启用')
+            // 页面重新可见时检查一次更新（用户打开/切回标签页即触发）
+            const checkUpdate = () => {
+              if (document.visibilityState === 'visible') reg.update().catch(() => {})
+            }
+            document.addEventListener('visibilitychange', checkUpdate)
+            // 新版本进入 waiting 状态：广播给页面，由 App.vue 弹窗提示
+            reg.addEventListener('updatefound', () => {
+              const newWorker = reg.installing
+              if (!newWorker) return
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  window.dispatchEvent(new CustomEvent('sw-update-available'))
+                }
+              })
+            })
+          })
           .catch((e) => console.log('PWA 注册失败:', e))
       })
     }
