@@ -27,7 +27,7 @@
       </button>
     </div>
 
-    <div class="submit-area">
+    <div class="submit-area" :class="{ multi: locked }">
       <button
         class="dont-know-btn"
         :class="{ active: dontKnow, disabled: locked }"
@@ -48,7 +48,7 @@
           class="analysis-btn"
           @click="$emit('analysis')"
         >
-          查看解析
+          解析
         </button>
         <button
           class="next-btn"
@@ -343,6 +343,29 @@ function toggleDontKnow() {
   font-size: 16px;
   cursor: pointer;
   transition: all 0.2s;
+  white-space: nowrap;
+}
+
+/* 提交后四个按钮：等大、均分一行 */
+.submit-area.multi {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.submit-area.multi .dont-know-btn,
+.submit-area.multi .submit-btn,
+.submit-area.multi .analysis-btn,
+.submit-area.multi .next-btn {
+  flex: 1;
+  width: auto;
+  grid-column: auto;
+  justify-self: auto;
+  padding: 12px 4px;
+}
+
+.submit-area.multi .result-btns {
+  display: contents;
 }
 
 .submit-btn {
