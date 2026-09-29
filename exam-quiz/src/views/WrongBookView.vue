@@ -93,7 +93,7 @@ function renderQuestion(text) {
   if (!text) return ''
   return text.replace(/\$([^$]+)\$/g, (match, formula) => {
     try {
-      return katex.renderToString(formula, { throwOnError: false })
+      return katex.renderToString('\\displaystyle ' + formula, { throwOnError: false })
     } catch (e) {
       return match
     }

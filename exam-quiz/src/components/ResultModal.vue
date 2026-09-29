@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div v-if="visible" class="modal-overlay" @click.self="$emit('close')">
     <div class="modal-content">
       <div class="modal-header">
@@ -54,7 +54,7 @@ function renderLatex(text) {
   if (!text) return ''
   return text.replace(/\$([^$]+)\$/g, (match, formula) => {
     try {
-      return katex.renderToString(formula, {
+      return katex.renderToString('\\displaystyle ' + formula, {
         throwOnError: false,
         displayMode: false
       })

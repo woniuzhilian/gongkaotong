@@ -63,17 +63,27 @@
         </button>
       </div>
     </div>
-    <!-- 图片放大遮罩：手机双指缩放 / 电脑滚轮缩放 -->
+    <!-- 图片放大遮罩：手机双指缩放 / 电脑滚轮缩放；放大后可按住拖动 -->
     <div
       class="img-zoom-mask"
       v-if="zoomSrc"
       @click.self="closeZoom"
       @wheel.prevent="onZoomWheel"
+      @mousedown.prevent="onZoomMouseDown"
       @touchstart="onZoomTouchStart"
       @touchmove.prevent="onZoomTouchMove"
       @touchend="onZoomTouchEnd"
+      @dblclick="resetZoom"
     >
-      <img :src="zoomSrc" :style="{ transform: `scale(${zoomScale})` }" draggable="false" />
+      <img
+        :src="zoomSrc"
+        :style="{ transform: `translate(${panX}px, ${panY}px) scale(${zoomScale})` }"
+        :class="{ dragging: dragging }"
+        draggable="false"
+      />
+      <div class="zoom-hint" v-if="!hintDismissed">
+        {{ isTouch ? '双指缩放 · 单指拖动 · 双击复位' : '滚轮缩放 · 按住拖动 · 双击复位' }}
+      </div>
       <button class="zoom-close" @click="closeZoom">×</button>
     </div>
 
@@ -177,10 +187,10 @@ async function submitReport() {
 // 渲染LaTeX公式
 function renderLatex(text) {
   if (!text) return ''
-  // 处理 $...$ 公式
+  // 处理 $...$ 公式（\displaystyle 保证分式、上下标按完整尺寸渲染）
   return text.replace(/\$([^$]+)\$/g, (match, formula) => {
     try {
-      return katex.renderToString(formula, {
+      return katex.renderToString('\\displaystyle ' + formula, {
         throwOnError: false,
         displayMode: false
       })
@@ -217,25 +227,86 @@ function toggleDontKnow() {
 // ===== 配图缩放查看 =====
 const zoomSrc = ref('')
 const zoomScale = ref(1)
+const panX = ref(0)
+const panY = ref(0)
+const dragging = ref(false)
+const isTouch = ref(false)
+const hintDismissed = ref(false)
 let pinchStartDist = 0
 let pinchStartScale = 1
+let dragStartX = 0
+let dragStartY = 0
+let panStartX = 0
+let panStartY = 0
+let dragMoved = false
 
 function onContentClick(e) {
   const img = e.target && e.target.closest ? e.target.closest('img') : null
   if (!img || !img.src) return
   zoomSrc.value = img.src
   zoomScale.value = 1
+  panX.value = 0
+  panY.value = 0
+  isTouch.value = 'ontouchstart' in window
 }
 
 function closeZoom() {
+  // 拖动结束时的 click 不关闭
+  if (dragMoved) {
+    dragMoved = false
+    return
+  }
   zoomSrc.value = ''
   zoomScale.value = 1
+  panX.value = 0
+  panY.value = 0
+  hintDismissed.value = true
 }
 
-// 电脑端：滚轮上拨放大、下拨缩小
+function resetZoom() {
+  zoomScale.value = 1
+  panX.value = 0
+  panY.value = 0
+}
+
+// 电脑端：滚轮缩放（以图片中心为基准）
 function onZoomWheel(e) {
   const delta = e.deltaY > 0 ? -0.2 : 0.2
-  zoomScale.value = Math.min(8, Math.max(0.5, zoomScale.value + delta))
+  zoomScale.value = Math.min(8, Math.max(1, zoomScale.value + delta))
+  if (zoomScale.value === 1) {
+    panX.value = 0
+    panY.value = 0
+  }
+}
+
+// 电脑端：按住拖动
+function onZoomMouseDown(e) {
+  if (e.button !== 0) return
+  dragging.value = true
+  dragMoved = false
+  dragStartX = e.clientX
+  dragStartY = e.clientY
+  panStartX = panX.value
+  panStartY = panY.value
+  window.addEventListener('mousemove', onZoomMouseMove)
+  window.addEventListener('mouseup', onZoomMouseUp)
+}
+
+function onZoomMouseMove(e) {
+  if (zoomScale.value <= 1) return
+  const dx = e.clientX - dragStartX
+  const dy = e.clientY - dragStartY
+  if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragMoved = true
+  panX.value = panStartX + dx
+  panY.value = panStartY + dy
+}
+
+function onZoomMouseUp() {
+  dragging.value = false
+  window.removeEventListener('mousemove', onZoomMouseMove)
+  window.removeEventListener('mouseup', onZoomMouseUp)
+  // 未移动时视为点击遮罩关闭（click.self 已处理，这里兜底）
+  setTimeout(() => { dragMoved = false }, 0)
 }
 
 function touchDistance(e) {
@@ -246,23 +317,53 @@ function touchDistance(e) {
   return Math.hypot(dx, dy)
 }
 
-// 手机端：双指捏合缩放
+// 手机端：单指拖动、双指捏合缩放
 function onZoomTouchStart(e) {
   if (e.touches.length === 2) {
     pinchStartDist = touchDistance(e)
     pinchStartScale = zoomScale.value
+  } else if (e.touches.length === 1) {
+    dragging.value = true
+    dragMoved = false
+    dragStartX = e.touches[0].clientX
+    dragStartY = e.touches[0].clientY
+    panStartX = panX.value
+    panStartY = panY.value
   }
 }
 
 function onZoomTouchMove(e) {
   if (e.touches.length === 2 && pinchStartDist > 0) {
     const d = touchDistance(e)
-    zoomScale.value = Math.min(8, Math.max(0.5, pinchStartScale * (d / pinchStartDist)))
+    zoomScale.value = Math.min(8, Math.max(1, pinchStartScale * (d / pinchStartDist)))
+    dragMoved = true
+    hintDismissed.value = true
+    if (zoomScale.value === 1) {
+      panX.value = 0
+      panY.value = 0
+    }
+  } else if (e.touches.length === 1 && dragging.value && zoomScale.value > 1) {
+    const dx = e.touches[0].clientX - dragStartX
+    const dy = e.touches[0].clientY - dragStartY
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      dragMoved = true
+      hintDismissed.value = true
+    }
+    panX.value = panStartX + dx
+    panY.value = panStartY + dy
   }
 }
 
 function onZoomTouchEnd(e) {
-  if (e.touches.length < 2) pinchStartDist = 0
+  pinchStartDist = 0
+  if (e.touches.length === 0) {
+    dragging.value = false
+    if (!dragMoved) {
+      // 单指轻点视为关闭
+      closeZoom()
+    }
+    setTimeout(() => { dragMoved = false }, 0)
+  }
 }
 </script>
 
@@ -757,6 +858,26 @@ function onZoomTouchEnd(e) {
   will-change: transform;
   user-select: none;
   -webkit-user-drag: none;
+  cursor: grab;
+}
+
+.img-zoom-mask img.dragging {
+  transition: none;
+  cursor: grabbing;
+}
+
+.zoom-hint {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.9);
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 14px;
+  pointer-events: none;
+  white-space: nowrap;
 }
 
 .zoom-close {
