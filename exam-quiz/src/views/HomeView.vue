@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="home-page">
     <!-- 顶部导航（step2和step3显示） -->
     <div class="top-nav" v-if="step > 1">
@@ -7,7 +7,7 @@
     </div>
 
     <div class="header">
-      <h1>岩土工程师刷题系统</h1>
+      <h1>工考通·岩土</h1>
       <p class="subtitle">公共基础 + 岩土专业基础 · 历年真题</p>
     </div>
 
@@ -106,7 +106,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getSmallSubjects, getYears, getQuestionsByBigSubject, makeSectionKey } from '../utils/quiz'
 import { getProgress, getWrongBook, clearAllQuizRecords, getSectionResult } from '../utils/storage'
@@ -117,6 +117,7 @@ const step = ref(1)
 const selectedBigSubject = ref('')
 const selectedMode = ref('')
 const savedProgress = ref(null)
+const refreshTick = ref(0)
 
 const HOME_STATE_KEY = 'quiz_home_state'
 
@@ -150,12 +151,27 @@ function refreshProgress() {
   savedProgress.value = getProgress()
 }
 
+function refreshAll() {
+  refreshProgress()
+  refreshTick.value++
+}
+
+function onCloudUpdate() {
+  refreshAll()
+}
+
 onMounted(() => {
   restoreHomeState()
   refreshProgress()
+  window.addEventListener('cloud-data-updated', onCloudUpdate)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('cloud-data-updated', onCloudUpdate)
 })
 
 const totalWrong = computed(() => {
+  refreshTick.value
   const wrong = getWrongBook()
   return (wrong['公共基础']?.length || 0) + (wrong['专业基础']?.length || 0)
 })
@@ -173,6 +189,7 @@ const profStats = computed(() => {
 })
 
 const itemList = computed(() => {
+  refreshTick.value
   if (!selectedBigSubject.value) return []
   const base = selectedMode.value === 'smallSubject'
     ? getSmallSubjects(selectedBigSubject.value)

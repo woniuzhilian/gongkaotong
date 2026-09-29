@@ -1,4 +1,7 @@
 // localStorage 封装 - 刷题进度、答题记录、错题本持久化存储
+// 所有写操作会自动防抖同步到 Supabase 云端
+
+import { scheduleCloudSync, pullFromCloud } from './supabase'
 
 const STORAGE_KEYS = {
   PROGRESS: 'exam_quiz_progress',      // 各板块进度map + lastActive
@@ -26,6 +29,17 @@ function set(key, value) {
   } catch (e) {
     return false
   }
+}
+
+// 收集当前 4 份业务数据，通知云端同步（防抖）
+function notifyCloudSync() {
+  const localData = {
+    progress: get(STORAGE_KEYS.PROGRESS, {}),
+    answers: get(STORAGE_KEYS.ANSWERS, {}),
+    wrong: get(STORAGE_KEYS.WRONG, {}),
+    results: get(STORAGE_KEYS.RESULTS, {})
+  }
+  scheduleCloudSync(localData)
 }
 
 // 生成板块唯一key
@@ -69,14 +83,18 @@ export function setProgress(progress) {
   const key = makeProgressKey(progress.bigSubject, progress.mode, progress.section)
   store.sections[key] = { ...progress }
   store.lastActive = { ...progress }
-  return set(STORAGE_KEYS.PROGRESS, store)
+  const ok = set(STORAGE_KEYS.PROGRESS, store)
+  notifyCloudSync()
+  return ok
 }
 
 // 清除最近活跃进度（完成板块后调用，不清除各板块独立进度）
 export function clearProgress() {
   const store = getProgressStore()
   store.lastActive = null
-  return set(STORAGE_KEYS.PROGRESS, store)
+  const ok = set(STORAGE_KEYS.PROGRESS, store)
+  notifyCloudSync()
+  return ok
 }
 
 // 清除指定板块的进度
@@ -91,13 +109,16 @@ export function clearSectionProgress(bigSubject, mode, section) {
       store.lastActive.section === section) {
     store.lastActive = null
   }
-  return set(STORAGE_KEYS.PROGRESS, store)
+  const ok = set(STORAGE_KEYS.PROGRESS, store)
+  notifyCloudSync()
+  return ok
 }
 
 // 清除所有刷题记录（进度+答题记录），但保留错题本
 export function clearAllQuizRecords() {
   localStorage.removeItem(STORAGE_KEYS.PROGRESS)
   localStorage.removeItem(STORAGE_KEYS.ANSWERS)
+  notifyCloudSync()
 }
 
 // ===== 答题记录 =====
@@ -111,7 +132,9 @@ export function saveAnswer(bigSubject, sectionKey, questionId, userAnswer) {
   if (!all[bigSubject]) all[bigSubject] = {}
   if (!all[bigSubject][sectionKey]) all[bigSubject][sectionKey] = {}
   all[bigSubject][sectionKey][questionId] = userAnswer
-  return set(STORAGE_KEYS.ANSWERS, all)
+  const ok = set(STORAGE_KEYS.ANSWERS, all)
+  notifyCloudSync()
+  return ok
 }
 
 export function getSectionAnswers(bigSubject, sectionKey) {
@@ -124,6 +147,7 @@ export function clearSectionAnswers(bigSubject, sectionKey) {
   if (all[bigSubject] && all[bigSubject][sectionKey]) {
     delete all[bigSubject][sectionKey]
     set(STORAGE_KEYS.ANSWERS, all)
+    notifyCloudSync()
   }
 }
 
@@ -143,6 +167,7 @@ export function addWrong(bigSubject, questionId) {
   if (!wrong[bigSubject].includes(questionId)) {
     wrong[bigSubject].push(questionId)
     set(STORAGE_KEYS.WRONG, wrong)
+    notifyCloudSync()
   }
 }
 
@@ -151,6 +176,7 @@ export function removeWrong(bigSubject, questionId) {
   if (wrong[bigSubject]) {
     wrong[bigSubject] = wrong[bigSubject].filter(id => id !== questionId)
     set(STORAGE_KEYS.WRONG, wrong)
+    notifyCloudSync()
   }
 }
 
@@ -171,7 +197,9 @@ export function saveSectionResult(bigSubject, sectionKey, result) {
     answered: result.answered,
     at: Date.now()
   }
-  return set(STORAGE_KEYS.RESULTS, all)
+  const ok = set(STORAGE_KEYS.RESULTS, all)
+  notifyCloudSync()
+  return ok
 }
 
 // 获取某板块最近一次完成结果
@@ -189,4 +217,39 @@ export function clearWrongBook(bigSubject) {
   const wrong = getWrongBook()
   wrong[bigSubject] = []
   set(STORAGE_KEYS.WRONG, wrong)
+  notifyCloudSync()
+}
+
+// ===== 云端同步（登录后调用）=====
+
+// 登录后从云端拉取数据，覆盖本地
+// 返回 true 表示云端有数据并已覆盖本地；false 表示云端无数据
+export async function syncFromCloud() {
+  const cloud = await pullFromCloud()
+  if (!cloud) return false
+  if (cloud.progress) set(STORAGE_KEYS.PROGRESS, cloud.progress)
+  if (cloud.answers) set(STORAGE_KEYS.ANSWERS, cloud.answers)
+  if (cloud.wrong) set(STORAGE_KEYS.WRONG, cloud.wrong)
+  if (cloud.results) set(STORAGE_KEYS.RESULTS, cloud.results)
+  return true
+}
+
+// 把当前本地数据整体推到云端（登录后如果云端空、本地有旧数据时调用）
+export async function pushAllToCloud() {
+  const { pushToCloud } = await import('./supabase')
+  const localData = {
+    progress: get(STORAGE_KEYS.PROGRESS, {}),
+    answers: get(STORAGE_KEYS.ANSWERS, {}),
+    wrong: get(STORAGE_KEYS.WRONG, {}),
+    results: get(STORAGE_KEYS.RESULTS, {})
+  }
+  await pushToCloud(localData)
+}
+
+// 退出登录时清空本地业务数据
+export function clearLocalData() {
+  localStorage.removeItem(STORAGE_KEYS.PROGRESS)
+  localStorage.removeItem(STORAGE_KEYS.ANSWERS)
+  localStorage.removeItem(STORAGE_KEYS.WRONG)
+  localStorage.removeItem(STORAGE_KEYS.RESULTS)
 }

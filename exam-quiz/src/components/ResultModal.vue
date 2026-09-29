@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div v-if="visible" class="modal-overlay" @click.self="$emit('close')">
     <div class="modal-content">
       <div class="modal-header">
@@ -90,7 +90,8 @@ const renderedAnalysis = computed(() => {
   width: 100%;
   max-width: 560px;
   max-height: 80vh;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   animation: slideUp 0.3s ease;
 }
 
@@ -139,6 +140,8 @@ const renderedAnalysis = computed(() => {
 
 .modal-body {
   padding: 20px;
+  flex: 1;
+  overflow-y: auto;
 }
 
 .answer-row {
