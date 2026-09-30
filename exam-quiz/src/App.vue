@@ -124,12 +124,55 @@ onMounted(async () => {
   router.afterEach((to) => {
     currentRoute.value = to.path
   })
+
+  // 手机端：从屏幕左缘向右滑动 = 返回上一级
+  document.addEventListener('touchstart', onSwipeStart, { passive: true })
+  document.addEventListener('touchend', onSwipeEnd, { passive: true })
 })
 
 onUnmounted(() => {
   unsubscribeProgress()
   window.removeEventListener('sw-update-available', onUpdateAvailable)
+  document.removeEventListener('touchstart', onSwipeStart)
+  document.removeEventListener('touchend', onSwipeEnd)
 })
+
+// ===== 手机端右滑返回 =====
+let swipeStartX = 0
+let swipeStartY = 0
+let swipeStartTime = 0
+let swipeActive = false
+
+function onSwipeStart(e) {
+  if (e.touches.length !== 1) { swipeActive = false; return }
+  const t = e.touches[0]
+  // 只在从屏幕左侧边缘 36px 内起手时启用，避免干扰正常滚动
+  swipeActive = t.clientX <= 36
+  swipeStartX = t.clientX
+  swipeStartY = t.clientY
+  swipeStartTime = Date.now()
+}
+
+function onSwipeEnd(e) {
+  if (!swipeActive) return
+  swipeActive = false
+  const t = e.changedTouches[0]
+  const dx = t.clientX - swipeStartX
+  const dy = t.clientY - swipeStartY
+  const dt = Date.now() - swipeStartTime
+  // 明显向右、以水平为主且动作较快
+  if (dx > 80 && Math.abs(dx) > Math.abs(dy) * 1.5 && dt < 500) {
+    goBackLevel()
+  }
+}
+
+function goBackLevel() {
+  if (showUpdate.value) return
+  // 有弹窗/图片放大遮罩时不触发返回
+  if (document.querySelector('.img-zoom-mask, .report-mask, .picker-mask, .update-mask, .analysis-mask')) return
+  if (currentRoute.value === '/') return
+  if (window.history.length > 1) router.back()
+}
 
 async function logout() {
   if (!confirm('确定退出登录吗？本地进度已同步到云端，下次登录可恢复。')) return

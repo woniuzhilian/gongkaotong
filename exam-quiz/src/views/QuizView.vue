@@ -171,11 +171,28 @@ onMounted(() => {
   loadQuestions()
   // 其他设备更新了收藏/错题等数据时，刷新当前题的收藏状态
   window.addEventListener('cloud-data-updated', onCloudUpdate)
+  // 电脑端：← 上一题，→ 下一题
+  window.addEventListener('keydown', onKeyNav)
 })
 
 onUnmounted(() => {
   window.removeEventListener('cloud-data-updated', onCloudUpdate)
+  window.removeEventListener('keydown', onKeyNav)
 })
+
+function onKeyNav(e) {
+  if (e.defaultPrevented) return
+  // 图片放大遮罩打开时不切题
+  if (document.querySelector('.img-zoom-mask')) return
+  if (showPicker.value) return
+  if (e.key === 'ArrowLeft') {
+    e.preventDefault()
+    prevQuestion()
+  } else if (e.key === 'ArrowRight') {
+    e.preventDefault()
+    handleNext()
+  }
+}
 
 function onCloudUpdate() {
   favTick.value++
