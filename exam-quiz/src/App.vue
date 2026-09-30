@@ -31,7 +31,7 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { getCurrentUser, signOut, onAuthStateChange, subscribeToProgress, unsubscribeProgress, getMySessionId, markMySessionOnline, clearMySession } from './utils/supabase'
-import { clearLocalData, syncFromCloud } from './utils/storage'
+import { clearLocalData, syncFromCloud, getProgress } from './utils/storage'
 import { setLoginState } from './main'
 
 const router = useRouter()
@@ -137,17 +137,21 @@ onUnmounted(() => {
   document.removeEventListener('touchend', onSwipeEnd)
 })
 
-// ===== 手机端右滑返回 =====
+// ===== 手机端滑动导航：左缘右滑返回上一级，右缘左滑回到最近做题界面 =====
 let swipeStartX = 0
 let swipeStartY = 0
 let swipeStartTime = 0
 let swipeActive = false
+let swipeDir = ''
 
 function onSwipeStart(e) {
   if (e.touches.length !== 1) { swipeActive = false; return }
   const t = e.touches[0]
-  // 只在从屏幕左侧边缘 36px 内起手时启用，避免干扰正常滚动
-  swipeActive = t.clientX <= 36
+  // 只在从屏幕左右边缘 36px 内起手时启用，避免干扰正常滚动
+  if (t.clientX <= 36) swipeDir = 'right'
+  else if (t.clientX >= window.innerWidth - 36) swipeDir = 'left'
+  else swipeDir = ''
+  swipeActive = swipeDir !== ''
   swipeStartX = t.clientX
   swipeStartY = t.clientY
   swipeStartTime = Date.now()
@@ -160,18 +164,38 @@ function onSwipeEnd(e) {
   const dx = t.clientX - swipeStartX
   const dy = t.clientY - swipeStartY
   const dt = Date.now() - swipeStartTime
-  // 明显向右、以水平为主且动作较快
-  if (dx > 80 && Math.abs(dx) > Math.abs(dy) * 1.5 && dt < 500) {
-    goBackLevel()
-  }
+  // 以水平为主且动作较快
+  if (Math.abs(dx) <= 80 || Math.abs(dx) <= Math.abs(dy) * 1.5 || dt >= 500) return
+  if (swipeDir === 'right') goBackLevel()
+  else if (swipeDir === 'left') goLastQuiz()
+}
+
+function swipeBlocked() {
+  if (showUpdate.value) return true
+  // 有弹窗/图片放大遮罩时不触发滑动导航
+  if (document.querySelector('.img-zoom-mask, .report-mask, .picker-mask, .update-mask, .analysis-mask')) return true
+  return false
 }
 
 function goBackLevel() {
-  if (showUpdate.value) return
-  // 有弹窗/图片放大遮罩时不触发返回
-  if (document.querySelector('.img-zoom-mask, .report-mask, .picker-mask, .update-mask, .analysis-mask')) return
-  if (currentRoute.value === '/') return
+  if (swipeBlocked()) return
+  // 首页三个步骤都在 / 路由内，右滑 = 返回上一步（由 HomeView 处理）
+  if (currentRoute.value === '/') {
+    window.dispatchEvent(new CustomEvent('app-swipe-back'))
+    return
+  }
   if (window.history.length > 1) router.back()
+}
+
+function goLastQuiz() {
+  if (swipeBlocked()) return
+  if (currentRoute.value === '/quiz') return
+  const p = getProgress()
+  if (!p || !p.bigSubject) return
+  router.push({
+    path: '/quiz',
+    query: { bigSubject: p.bigSubject, mode: p.mode, section: p.section, resume: '1' }
+  })
 }
 
 async function logout() {

@@ -169,14 +169,24 @@ function onCloudUpdate() {
   refreshAll()
 }
 
+// 手机端从屏幕左缘右滑：在首页等价于返回上一步
+function onSwipeBack() {
+  if (step.value > 1) {
+    step.value--
+    saveHomeState()
+  }
+}
+
 onMounted(() => {
   restoreHomeState()
   refreshProgress()
   window.addEventListener('cloud-data-updated', onCloudUpdate)
+  window.addEventListener('app-swipe-back', onSwipeBack)
 })
 
 onUnmounted(() => {
   window.removeEventListener('cloud-data-updated', onCloudUpdate)
+  window.removeEventListener('app-swipe-back', onSwipeBack)
 })
 
 const totalWrong = computed(() => {
