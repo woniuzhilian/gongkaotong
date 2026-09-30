@@ -3,7 +3,7 @@
     <div class="page-header">
       <button class="back-btn" @click="goBack">← 返回</button>
       <h1>我的收藏</h1>
-      <button class="home-btn" @click="$router.push('/')">🏠 首页</button>
+      <button class="home-btn" @click="goHome">🏠 首页</button>
     </div>
 
     <!-- 选择大科目 -->
@@ -74,6 +74,12 @@ function goBack() {
   } else {
     router.push('/')
   }
+}
+
+function goHome() {
+  // 清除首页步骤状态，确保真正回到首页第一步
+  localStorage.removeItem('quiz_home_state')
+  router.push('/')
 }
 
 const favCounts = computed(() => ({

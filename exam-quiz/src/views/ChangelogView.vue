@@ -3,7 +3,7 @@
     <div class="page-header">
       <button class="back-btn" @click="goBack">← 返回</button>
       <h1>更新日志</h1>
-      <button class="home-btn" @click="$router.push('/')">🏠 首页</button>
+      <button class="home-btn" @click="goHome">🏠 首页</button>
     </div>
 
     <div class="cl-tip">当前版本 v{{ currentVersion }}</div>
@@ -52,6 +52,16 @@ onMounted(async () => {
 })
 
 function goBack() {
+  if (window.history.length > 1) {
+    router.back()
+  } else {
+    router.push('/')
+  }
+}
+
+function goHome() {
+  // 清除首页步骤状态，确保真正回到首页第一步
+  localStorage.removeItem('quiz_home_state')
   router.push('/')
 }
 </script>

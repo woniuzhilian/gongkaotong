@@ -161,6 +161,8 @@ function goWrongBook() {
 }
 
 function goHome() {
+  // 清除首页步骤状态，确保真正回到首页第一步
+  localStorage.removeItem('quiz_home_state')
   router.push('/')
 }
 </script>
