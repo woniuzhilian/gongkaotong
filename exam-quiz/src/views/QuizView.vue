@@ -269,8 +269,8 @@ function handleSubmit(dontKnow = false) {
   // 保存答题记录（"我不会"记为哨兵值，统计时等同答错）
   saveAnswer(bigSubject.value, sectionKey.value, currentQuestion.value.id, dontKnow ? DONT_KNOW : selectedAnswer.value)
 
-  // 答错或"我不会"均加入错题本
-  if (dontKnow || selectedAnswer.value !== currentQuestion.value.answer) {
+  // 答错或"我不会"均加入错题本（收藏夹练习除外，答错不加入错题本）
+  if ((dontKnow || selectedAnswer.value !== currentQuestion.value.answer) && mode.value !== 'fav') {
     addWrong(bigSubject.value, currentQuestion.value.id)
   }
 

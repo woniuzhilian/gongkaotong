@@ -53,8 +53,9 @@
       <div class="action-buttons">
         <button class="btn primary" @click="retry">重新练习</button>
         <button v-if="isWrongMode" class="btn" @click="removeCorrectFromWrong">从错题本中移除答对的题目</button>
+        <button v-else-if="isFavMode" class="btn" @click="removeCorrectFromFav">从收藏夹中移出答对的题目</button>
         <button v-else class="btn" @click="goWrongBook">查看错题</button>
-        <button class="btn" @click="goHome">返回首页</button>
+        <button class="btn" @click="goBack">返回</button>
       </div>
     </div>
   </div>
@@ -72,7 +73,7 @@ import {
 } from '../utils/quiz'
 import {
   getSectionAnswers, getWrongBook, getFavorites, clearSectionProgress, clearSectionAnswers,
-  removeWrong, saveSectionResult
+  removeWrong, removeFavorite, saveSectionResult
 } from '../utils/storage'
 
 const route = useRoute()
@@ -87,6 +88,8 @@ const circumference = 2 * Math.PI * 70
 
 // 是否为「错题本查看结果页」
 const isWrongMode = computed(() => mode.value === 'wrong')
+// 是否为「收藏夹练习结果页」
+const isFavMode = computed(() => mode.value === 'fav')
 
 const sectionKey = computed(() => makeSectionKey(mode.value, section.value))
 
@@ -160,10 +163,34 @@ function goWrongBook() {
   router.push('/wrongbook')
 }
 
-function goHome() {
-  // 清除首页步骤状态，确保真正回到首页第一步
-  localStorage.removeItem('quiz_home_state')
-  router.push('/')
+// 收藏夹练习结果页：从收藏夹中移出本次答对的题目，仅保留答错的
+function removeCorrectFromFav() {
+  const answers = getSectionAnswers(bigSubject.value, sectionKey.value)
+  let removed = 0
+  for (const q of questions.value) {
+    const userAns = answers[q.id]
+    if (userAns && userAns === q.answer) {
+      removeFavorite(bigSubject.value, q.id)
+      removed++
+    }
+  }
+  if (removed > 0) {
+    alert(`已从收藏夹中移出 ${removed} 道本次答对的题目`)
+  } else {
+    alert('本次没有答对的题目可移出')
+  }
+}
+
+// 返回：套题回到首页第三步（选择小科目/年份），错题本/收藏夹回到各自列表页
+function goBack() {
+  if (mode.value === 'wrong') {
+    router.push('/wrongbook')
+  } else if (mode.value === 'fav') {
+    router.push('/favorites')
+  } else {
+    // 保留 quiz_home_state，回到首页第三步
+    router.push('/')
+  }
 }
 </script>
 
