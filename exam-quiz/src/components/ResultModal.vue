@@ -32,7 +32,7 @@
             class="knowledge-btn"
             :class="{ disabled: !hasKnowledge }"
             :disabled="!hasKnowledge"
-            :title="hasKnowledge ? '查看本题考查的知识点扩展' : '计算题暂无知识点扩展'"
+            :title="hasKnowledge ? '查看本题考查的知识点扩展' : '该题暂无知识点扩展'"
             @click="showKnowledge = true"
           >
             知识点扩展
@@ -78,11 +78,11 @@ watch(() => props.question, () => { showKnowledge.value = false })
 
 const isCorrect = computed(() => props.userAnswer === props.question.answer)
 
-// 知识点扩展：仅概念题可用；优先按题目id匹配，其次按「大科目|小科目」兜底
+// 知识点扩展：仅概念题且已为该题单独编写过内容时才可用（不设科目级兜底，避免出现与本题无关的内容）
 const knowledgeHtml = computed(() => {
   const q = props.question
   if (!q || q.qtype !== 'concept') return ''
-  return knowledgeExt['q:' + q.id] || knowledgeExt[q.bigSubject + '|' + q.smallSubject] || ''
+  return knowledgeExt['q:' + q.id] || ''
 })
 const hasKnowledge = computed(() => !!knowledgeHtml.value)
 

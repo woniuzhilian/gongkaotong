@@ -97,7 +97,7 @@
         <div class="report-body">
           <p class="report-tip">请问哪里有问题？（可多选）</p>
           <div class="report-options">
-            <label class="report-option" v-for="part in ['题干', '配图', '选项', '解析', '答案']" :key="part">
+            <label class="report-option" v-for="part in ['题干', '配图', '选项', '解析', '答案', '知识点', '其它']" :key="part">
               <input type="checkbox" :value="part" v-model="selectedParts" />
               <span>{{ part }}</span>
             </label>

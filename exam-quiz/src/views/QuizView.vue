@@ -300,7 +300,9 @@ function handleNext() {
 
   if (currentIndex.value >= questions.value.length - 1) {
     // 完成所有题目，跳转到结果页
-    router.push({
+    // 用 replace：结果页不残留在历史栈中，避免从收藏夹/错题本返回练习后
+    // 点“返回上一步”又退回到结果页
+    router.replace({
       path: '/result',
       query: {
         bigSubject: bigSubject.value,

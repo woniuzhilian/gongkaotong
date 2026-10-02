@@ -130,8 +130,9 @@ function loadQuestions() {
 
 function retry() {
   // 重新练习：清除该板块的答题记录，允许重新作答
+  // 用 replace：结果页被做题页替换，历史栈不增长，返回逻辑保持正确
   clearSectionAnswers(bigSubject.value, sectionKey.value)
-  router.push({
+  router.replace({
     path: '/quiz',
     query: {
       bigSubject: bigSubject.value,
@@ -181,12 +182,15 @@ function removeCorrectFromFav() {
   }
 }
 
-// 返回：套题回到首页第三步（选择小科目/年份），错题本/收藏夹回到各自列表页
+// 返回：错题本/收藏夹练习回到各自的列表页（用 back 弹回历史栈中已有的那一层，
+// 使列表页的“返回上一步”能继续回到进入列表页前的首页）；套题回到首页第三步
 function goBack() {
-  if (mode.value === 'wrong') {
-    router.push('/wrongbook')
-  } else if (mode.value === 'fav') {
-    router.push('/favorites')
+  if (mode.value === 'wrong' || mode.value === 'fav') {
+    if (window.history.length > 1) {
+      router.back()
+    } else {
+      router.push(mode.value === 'wrong' ? '/wrongbook' : '/favorites')
+    }
   } else {
     // 保留 quiz_home_state，回到首页第三步
     router.push('/')
