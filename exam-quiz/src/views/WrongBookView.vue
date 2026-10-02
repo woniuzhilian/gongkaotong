@@ -1,7 +1,7 @@
 <template>
   <div class="wrongbook-page">
     <div class="page-header">
-      <button class="back-btn" @click="goBack">← 返回</button>
+      <button class="back-btn" @click="goBack">← 返回上一步</button>
       <h1>错题本</h1>
       <button class="home-btn" @click="goHome">🏠 首页</button>
     </div>

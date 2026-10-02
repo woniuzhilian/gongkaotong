@@ -1,8 +1,8 @@
 <template>
   <div class="favorites-page">
     <div class="page-header">
-      <button class="back-btn" @click="goBack">← 返回</button>
-      <h1>我的收藏</h1>
+      <button class="back-btn" @click="goBack">← 返回上一步</button>
+      <h1>收藏夹</h1>
       <button class="home-btn" @click="goHome">🏠 首页</button>
     </div>
 
@@ -124,7 +124,7 @@ function practiceAll() {
     query: {
       bigSubject: selectedBigSubject.value,
       mode: 'fav',
-      section: '我的收藏'
+      section: '收藏夹'
     }
   })
 }
@@ -135,7 +135,7 @@ function practiceOne(index) {
     query: {
       bigSubject: selectedBigSubject.value,
       mode: 'fav',
-      section: '我的收藏',
+      section: '收藏夹',
       startIndex: index
     }
   })

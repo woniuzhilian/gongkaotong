@@ -19,7 +19,7 @@
       </button>
       <button class="nav-btn fav" @click="goFavorites">
         <span class="nav-icon">⭐</span>
-        <span>我的收藏</span>
+        <span>收藏夹</span>
         <span class="fav-count" v-if="totalFav > 0">{{ totalFav }}题</span>
       </button>
       <button class="nav-btn wrong" @click="goWrongBook">
