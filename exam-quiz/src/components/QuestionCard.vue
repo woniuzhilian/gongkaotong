@@ -3,6 +3,12 @@
     <div class="question-header">
       <span class="q-num">{{ question.year }}-{{ question.yearQnum || question.id }}</span>
       <button
+        class="scratch-btn"
+        :class="{ active: showScratch }"
+        @click="showScratch = true"
+        title="草稿纸"
+      >✏️ 草稿</button>
+      <button
         class="fav-btn"
         :class="{ active: isFav }"
         @click="$emit('toggle-favorite')"
@@ -117,12 +123,20 @@
       </div>
     </div>
 
+    <!-- 草稿纸：全屏透明画布，可直接覆在题目上书写圈画 -->
+    <ScratchPad
+      :visible="showScratch"
+      :question-key="question.id"
+      @close="showScratch = false"
+    />
+
   </div>
 </template>
 
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { submitFeedback } from '../utils/supabase'
+import ScratchPad from './ScratchPad.vue'
 import katex from 'katex'
 
 const props = defineProps({
@@ -149,6 +163,9 @@ watch(() => props.initialAnswer, (val) => {
 })
 
 const isLast = computed(() => props.currentIndex === props.total - 1)
+
+// 草稿纸
+const showScratch = ref(false)
 
 // 报错反馈相关
 const showReportModal = ref(false)
@@ -897,5 +914,44 @@ function onZoomTouchEnd(e) {
 
 .zoom-close:hover {
   background: rgba(255,255,255,0.4);
+}
+
+/* 草稿按钮（紧挨题号，收藏/报错仍靠右） */
+.scratch-btn {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid #e0e0e0;
+  font-size: 13px;
+  color: #999;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.scratch-btn:hover {
+  background: #e8f2ff;
+  color: #4a90d9;
+  border-color: #a8ccf0;
+}
+
+/* 草稿纸打开期间保持加深，让用户随时知道当前在草稿模式 */
+.scratch-btn.active {
+  background: #e8f2ff;
+  color: #4a90d9;
+  border-color: #a8ccf0;
+}
+
+/* 手机竖屏：题号+草稿+收藏+报错四个元素同排，收紧间距与字号 */
+@media (max-width: 600px) {
+  .question-header {
+    gap: 6px;
+  }
+  .scratch-btn,
+  .fav-btn,
+  .report-btn {
+    padding: 3px 6px;
+    font-size: 11px;
+  }
 }
 </style>

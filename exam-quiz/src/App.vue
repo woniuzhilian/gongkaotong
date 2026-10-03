@@ -145,6 +145,14 @@ let swipeActive = false
 let swipeDir = ''
 
 function onSwipeStart(e) {
+  // 草稿纸/弹窗内起笔时，直接看事件目标是否落在遮罩里（比依赖子组件 stopPropagation 更可靠）
+  if (e.target && e.target.closest && e.target.closest('.scratch-mask')) {
+    swipeActive = false
+    swipeDir = ''
+    return
+  }
+  // 有弹窗/图片放大/草稿纸遮罩时不启动边缘滑动
+  if (swipeBlocked()) { swipeActive = false; swipeDir = ''; return }
   if (e.touches.length !== 1) { swipeActive = false; return }
   const t = e.touches[0]
   // 只在从屏幕左右边缘 36px 内起手时启用，避免干扰正常滚动
@@ -173,7 +181,7 @@ function onSwipeEnd(e) {
 function swipeBlocked() {
   if (showUpdate.value) return true
   // 有弹窗/图片放大遮罩时不触发滑动导航
-  if (document.querySelector('.img-zoom-mask, .report-mask, .picker-mask, .update-mask, .analysis-mask')) return true
+  if (document.querySelector('.img-zoom-mask, .report-mask, .picker-mask, .update-mask, .analysis-mask, .scratch-mask')) return true
   return false
 }
 

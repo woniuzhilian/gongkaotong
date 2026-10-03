@@ -182,8 +182,8 @@ onUnmounted(() => {
 
 function onKeyNav(e) {
   if (e.defaultPrevented) return
-  // 图片放大遮罩打开时不切题
-  if (document.querySelector('.img-zoom-mask')) return
+  // 图片放大遮罩、草稿纸打开时不切题
+  if (document.querySelector('.img-zoom-mask, .scratch-mask')) return
   if (showPicker.value) return
   if (e.key === 'ArrowLeft') {
     e.preventDefault()
