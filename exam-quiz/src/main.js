@@ -1,10 +1,11 @@
-import { createApp } from 'vue'
+import { createApp, reactive } from 'vue'
 import { createRouter, createWebHashHistory } from 'vue-router'
 import App from './App.vue'
 import 'katex/dist/katex.min.css'
 import './style.css'
 import { getCurrentUser } from './utils/supabase'
 import { syncFromCloud } from './utils/storage'
+import { attachGlobalSoundListener } from './utils/sound'
 
 // 路由配置
 const routes = [
@@ -14,6 +15,7 @@ const routes = [
   { path: '/wrongbook', component: () => import('./views/WrongBookView.vue') },
   { path: '/favorites', component: () => import('./views/FavoritesView.vue') },
   { path: '/changelog', component: () => import('./views/ChangelogView.vue') },
+  { path: '/security', component: () => import('./views/SecurityView.vue') },
   { path: '/result', component: () => import('./views/ResultView.vue') }
 ]
 
@@ -25,6 +27,9 @@ const router = createRouter({
 // 应用启动：检查登录状态，同步云端数据
 let authReady = false
 let isLoggedIn = false
+
+// 游客登录状态（用 reactive 包装，让组件可以直接响应式使用）
+export const guestState = reactive({ value: false })
 
 async function initAuth() {
   try {
@@ -42,16 +47,16 @@ async function initAuth() {
   }
 }
 
-// 路由守卫：未登录跳转到 /auth
+// 路由守卫：未登录且非游客跳转到 /auth
 router.beforeEach(async (to) => {
   // 等待初始化完成
   if (!authReady) {
     await initAuth()
   }
-  if (!to.meta.public && !isLoggedIn) {
+  if (!to.meta.public && !isLoggedIn && !guestState.value) {
     return { path: '/auth' }
   }
-  // 已登录访问登录页，直接进首页
+  // 已登录用户访问登录页，直接进首页；游客访问登录页允许（游客想转成正常用户登录）
   if (to.path === '/auth' && isLoggedIn) {
     return { path: '/' }
   }
@@ -65,8 +70,35 @@ router.beforeEach(async (to) => {
 // 登录状态变化时同步更新（其他地方调用登出后会触发）
 export function setLoginState(loggedIn) {
   isLoggedIn = loggedIn
+  if (loggedIn) {
+    guestState.value = false
+    localStorage.removeItem('is_guest')
+  }
+}
+
+// 游客状态管理
+export function setGuestState(guest) {
+  guestState.value = !!guest
+  if (guest) {
+    localStorage.setItem('is_guest', '1')
+    isLoggedIn = false
+  } else {
+    localStorage.removeItem('is_guest')
+  }
+}
+
+export function getIsGuest() {
+  return guestState.value
+}
+
+// 应用启动时恢复游客状态
+if (localStorage.getItem('is_guest') === '1') {
+  guestState.value = true
 }
 
 const app = createApp(App)
 app.use(router)
 app.mount('#app')
+
+// 全局音效监听（普通按钮点击音；提交按钮的正确/错误音效由 QuizView 单独触发）
+attachGlobalSoundListener()

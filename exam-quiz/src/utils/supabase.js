@@ -64,6 +64,24 @@ export async function resetPassword(email) {
   if (error) throw error
 }
 
+// 修改密码（安全中心）：需传入原密码做重新认证，再更新为新密码
+export async function changePassword(oldPassword, newPassword) {
+  // 1. 用原密码重新登录，满足 Supabase 的敏感操作重认证要求
+  const user = await getCurrentUser()
+  if (!user) throw new Error('请先登录')
+  const { error: reErr } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: oldPassword
+  })
+  if (reErr) throw new Error('原密码不正确')
+  // 2. 更新为新密码
+  const { error } = await supabase.auth.updateUser({ password: newPassword })
+  if (error) {
+    if (String(error.message).toLowerCase().includes('password')) throw new Error('新密码不符合要求（至少 6 位）')
+    throw error
+  }
+}
+
 // 登出
 export async function signOut() {
   const { error } = await supabase.auth.signOut()
@@ -125,6 +143,7 @@ export async function pushToCloud(localData) {
     wrong: localData.wrong || {},
     favorites: localData.favorites || {},
     results: localData.results || {},
+    settings: localData.settings || {},
     updated_at: new Date().toISOString()
   }
 
@@ -133,9 +152,15 @@ export async function pushToCloud(localData) {
     .from('user_progress')
     .upsert(payload)
 
+  // 若数据库尚未有 settings 列，去掉该字段重试，保证其余数据同步不受影响
+  if (error && String(error.message).includes('settings')) {
+    const { settings, ...rest } = payload
+    error = (await supabase.from('user_progress').upsert(rest)).error
+  }
   // 若数据库尚未有 favorites 列，去掉该字段重试，保证其余数据同步不受影响
   if (error && String(error.message).includes('favorites')) {
     const { favorites, ...rest } = payload
+    delete rest.settings
     error = (await supabase.from('user_progress').upsert(rest)).error
   }
   if (error) {
@@ -151,19 +176,30 @@ export async function pullFromCloud() {
 
   let { data, error } = await supabase
     .from('user_progress')
-    .select('progress, answers, wrong, favorites, results, updated_at')
+    .select('progress, answers, wrong, favorites, results, settings, updated_at')
     .eq('id', userId)
     .single()
 
-  // 若 favorites 列尚不存在，降级为不含该字段的查询
-  if (error && String(error.message).includes('favorites')) {
+  // 若 settings 列尚不存在，降级为不含该字段的查询
+  if (error && String(error.message).includes('settings')) {
     const r2 = await supabase
       .from('user_progress')
-      .select('progress, answers, wrong, results, updated_at')
+      .select('progress, answers, wrong, favorites, results, updated_at')
       .eq('id', userId)
       .single()
     data = r2.data
     error = r2.error
+  }
+
+  // 若 favorites 列尚不存在，降级为不含该字段的查询
+  if (error && String(error.message).includes('favorites')) {
+    const r3 = await supabase
+      .from('user_progress')
+      .select('progress, answers, wrong, results, updated_at')
+      .eq('id', userId)
+      .single()
+    data = r3.data
+    error = r3.error
   }
 
   if (error) {

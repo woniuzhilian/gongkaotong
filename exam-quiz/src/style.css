@@ -70,3 +70,23 @@ button:active {
     font-size: 14px;
   }
 }
+
+/* 草稿纸打开时：底层页面不再接收指针事件
+   （防止 iPad 手写笔/手掌穿透触发「上一题」等按钮导致断笔）；
+   草稿遮罩与计算器浮窗重新开启 pointer-events，保证可用 */
+body.scratch-open .quiz-page {
+  pointer-events: none;
+}
+body.scratch-open .scratch-mask,
+body.scratch-open .calc-float {
+  pointer-events: auto;
+}
+
+/* 草稿纸打开时禁止整页选中与长按菜单：
+   iPad 上用手写笔在草稿纸里拖画时，曾把底层「← 上一题」的文字选中
+   （弹出「拷贝/查询/翻译」菜单并中断书写），这里从根上禁止选中 */
+body.scratch-open {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}

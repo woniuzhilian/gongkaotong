@@ -42,6 +42,7 @@
       :initial-answer="currentUserAnswer"
       :is-fav="currentIsFav"
       :is-last="currentIndex === questions.length - 1"
+      :is-guest="isGuest"
       @submit="handleSubmit"
       @next="handleNext"
       @select="handleSelect"
@@ -73,6 +74,7 @@
       :question="currentQuestion"
       :user-answer="selectedAnswer"
       :is-last="currentIndex === questions.length - 1"
+      :is-guest="isGuest"
       @close="closeModal"
       @next="handleNext"
     />
@@ -125,6 +127,8 @@ import {
   saveAnswer, getSectionAnswers, clearSectionAnswers,
   addWrong, getWrongBook, getFavorites, isFavorite, toggleFavorite
 } from '../utils/storage'
+import { guestState } from '../main'
+import { playCorrect, playWrong } from '../utils/sound'
 
 const route = useRoute()
 const router = useRouter()
@@ -138,6 +142,7 @@ const selectedAnswer = ref('')
 const isLocked = ref(false)
 const showModal = ref(false)
 const showPicker = ref(false)
+const isGuest = computed(() => guestState.value)
 
 const sectionKey = computed(() => makeSectionKey(mode.value, section.value))
 
@@ -182,8 +187,8 @@ onUnmounted(() => {
 
 function onKeyNav(e) {
   if (e.defaultPrevented) return
-  // 图片放大遮罩、草稿纸打开时不切题
-  if (document.querySelector('.img-zoom-mask, .scratch-mask')) return
+  // 图片放大遮罩、草稿纸、计算器浮窗打开时不切题
+  if (document.querySelector('.img-zoom-mask, .scratch-mask, .calc-float.open')) return
   if (showPicker.value) return
   if (e.key === 'ArrowLeft') {
     e.preventDefault()
@@ -265,6 +270,10 @@ function handleSubmit(dontKnow = false) {
   if (!dontKnow && !selectedAnswer.value) return
 
   isLocked.value = true
+
+  // 提交按钮的正确/错误音效（提交按钮本身在 sound.js 里被跳过了，这里手动播放）
+  const correct = !dontKnow && selectedAnswer.value === currentQuestion.value.answer
+  if (correct) playCorrect(); else playWrong()
 
   // 保存答题记录（"我不会"记为哨兵值，统计时等同答错）
   saveAnswer(bigSubject.value, sectionKey.value, currentQuestion.value.id, dontKnow ? DONT_KNOW : selectedAnswer.value)

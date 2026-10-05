@@ -1,5 +1,5 @@
 // Service Worker - PWA 离线缓存
-const CACHE_NAME = 'gongkaotong-v4'
+const CACHE_NAME = 'gongkaotong-v6'
 const ASSETS = [
   '/',
   '/index.html',

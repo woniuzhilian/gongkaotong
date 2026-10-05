@@ -9,12 +9,23 @@
         title="草稿纸"
       >✏️ 草稿</button>
       <button
+        class="scratch-btn calc-btn"
+        :class="{ active: showCalc }"
+        @click="showCalc = !showCalc"
+        title="计算器"
+      >🧮<span class="calc-txt"> 计算器</span></button>
+      <button
         class="fav-btn"
         :class="{ active: isFav }"
         @click="$emit('toggle-favorite')"
         :title="isFav ? '取消收藏' : '收藏'"
       >{{ isFav ? '★ 已收藏' : '☆ 收藏' }}</button>
-      <button class="report-btn" @click="showReportModal = true" title="报错">⚠️ 报错</button>
+      <button
+        class="report-btn"
+        :class="{ disabled: isGuest }"
+        @click="openReport"
+        title="报错"
+      >⚠️ 报错</button>
     </div>
 
     <div class="question-content" v-html="renderedQuestion" @click="onContentClick"></div>
@@ -128,6 +139,14 @@
       :visible="showScratch"
       :question-key="question.id"
       @close="showScratch = false"
+      @open-calculator="showCalc = true"
+    />
+
+    <!-- 计算器浮窗：层级在草稿纸之上，草稿打开时也能正常使用 -->
+    <Calculator
+      :visible="showCalc"
+      :question-key="question.id"
+      @close="showCalc = false"
     />
 
   </div>
@@ -137,6 +156,7 @@
 import { computed, ref, watch } from 'vue'
 import { submitFeedback } from '../utils/supabase'
 import ScratchPad from './ScratchPad.vue'
+import Calculator from './Calculator.vue'
 import katex from 'katex'
 
 const props = defineProps({
@@ -145,7 +165,8 @@ const props = defineProps({
   total: { type: Number, default: 0 },
   locked: { type: Boolean, default: false },
   initialAnswer: { type: String, default: '' },
-  isFav: { type: Boolean, default: false }
+  isFav: { type: Boolean, default: false },
+  isGuest: { type: Boolean, default: false }
 })
 
 const emit = defineEmits(['submit', 'next', 'select', 'analysis', 'toggle-favorite'])
@@ -167,6 +188,9 @@ const isLast = computed(() => props.currentIndex === props.total - 1)
 // 草稿纸
 const showScratch = ref(false)
 
+// 计算器浮窗
+const showCalc = ref(false)
+
 // 报错反馈相关
 const showReportModal = ref(false)
 const selectedParts = ref([])
@@ -174,6 +198,14 @@ const reportText = ref('')
 const reportLoading = ref(false)
 const reportError = ref('')
 const reportSuccess = ref(false)
+
+function openReport() {
+  if (props.isGuest) {
+    alert('游客模式无法使用报错功能，请先登录后再反馈')
+    return
+  }
+  showReportModal.value = true
+}
 
 async function submitReport() {
   reportError.value = ''
@@ -715,6 +747,17 @@ function onZoomTouchEnd(e) {
   border-color: #ffccc7;
 }
 
+.report-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.report-btn.disabled:hover {
+  background: none;
+  color: #999;
+  border-color: #e0e0e0;
+}
+
 /* 报错弹窗 */
 .report-mask {
   position: fixed;
@@ -942,7 +985,7 @@ function onZoomTouchEnd(e) {
   border-color: #a8ccf0;
 }
 
-/* 手机竖屏：题号+草稿+收藏+报错四个元素同排，收紧间距与字号 */
+/* 手机竖屏：题号+草稿+计算器+收藏+报错五个元素同排，收紧间距与字号 */
 @media (max-width: 600px) {
   .question-header {
     gap: 6px;

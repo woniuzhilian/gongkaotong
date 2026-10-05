@@ -32,14 +32,17 @@ function set(key, value) {
   }
 }
 
-// 收集当前 4 份业务数据，通知云端同步（防抖）
+// 收集当前业务数据，通知云端同步（防抖）
+// 游客模式下跳过云端同步，数据仅保存在本地浏览器
 function notifyCloudSync() {
+  if (localStorage.getItem('is_guest') === '1') return
   const localData = {
     progress: get(STORAGE_KEYS.PROGRESS, {}),
     answers: get(STORAGE_KEYS.ANSWERS, {}),
     wrong: get(STORAGE_KEYS.WRONG, {}),
     favorites: get(STORAGE_KEYS.FAVORITES, {}),
-    results: get(STORAGE_KEYS.RESULTS, {})
+    results: get(STORAGE_KEYS.RESULTS, {}),
+    settings: get(STORAGE_KEYS.SETTINGS, {})
   }
   scheduleCloudSync(localData)
 }
@@ -271,6 +274,23 @@ export function clearFavorites(bigSubject) {
   notifyCloudSync()
 }
 
+// ===== 计算器设置（透明度 / 大小 / 位置）=====
+// 结构：{ opacity: 0.5, width: 320, x: 0.6, y: 0.15 }
+// x/y 用「占视口宽高的比例」存储，换设备（屏幕尺寸不同）也能落在相对一致的位置
+export const CALC_DEFAULTS = { opacity: 0.5, width: 320, x: 0.55, y: 0.12 }
+
+export function getCalculatorSettings() {
+  const s = get(STORAGE_KEYS.SETTINGS, {})
+  return { ...CALC_DEFAULTS, ...(s.calculator || {}) }
+}
+
+export function setCalculatorSettings(patch) {
+  const s = get(STORAGE_KEYS.SETTINGS, {})
+  s.calculator = { ...(s.calculator || {}), ...patch }
+  set(STORAGE_KEYS.SETTINGS, s)
+  notifyCloudSync()
+}
+
 // ===== 云端同步（登录后调用）=====
 
 // 登录后从云端拉取数据，覆盖本地
@@ -283,6 +303,7 @@ export async function syncFromCloud() {
   if (cloud.wrong) set(STORAGE_KEYS.WRONG, cloud.wrong)
   if (cloud.favorites) set(STORAGE_KEYS.FAVORITES, cloud.favorites)
   if (cloud.results) set(STORAGE_KEYS.RESULTS, cloud.results)
+  if (cloud.settings) set(STORAGE_KEYS.SETTINGS, cloud.settings)
   return true
 }
 
@@ -294,7 +315,8 @@ export async function pushAllToCloud() {
     answers: get(STORAGE_KEYS.ANSWERS, {}),
     wrong: get(STORAGE_KEYS.WRONG, {}),
     favorites: get(STORAGE_KEYS.FAVORITES, {}),
-    results: get(STORAGE_KEYS.RESULTS, {})
+    results: get(STORAGE_KEYS.RESULTS, {}),
+    settings: get(STORAGE_KEYS.SETTINGS, {})
   }
   await pushToCloud(localData)
 }

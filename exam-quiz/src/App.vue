@@ -1,9 +1,23 @@
 <template>
   <div id="app">
     <!-- 顶部用户栏（只在首页显示） -->
-    <div class="user-bar" v-if="userPhone && isHomePage">
-      <span class="user-phone">👤 {{ userPhone }}</span>
-      <button class="logout-btn" @click="logout">退出登录</button>
+    <div class="user-bar" v-if="(userPhone || isGuest) && isHomePage">
+      <!-- 左侧：游客保持原样；登录用户显示「用户中心」按钮（不再显示手机号） -->
+      <template v-if="isGuest">
+        <span class="user-phone">👤 游客模式</span>
+        <button class="logout-btn" @click="logout">退出游客</button>
+      </template>
+      <div class="user-center" v-else ref="centerEl">
+        <button class="center-btn" @click="showCenterMenu = !showCenterMenu">👤 用户中心</button>
+        <div class="center-menu" v-if="showCenterMenu" @click="showCenterMenu = false">
+          <button class="center-item" @click="goSecurity">🔒 安全中心</button>
+          <button class="center-item danger" @click="logout">退出登录</button>
+        </div>
+      </div>
+      <!-- 右侧：音效开关 -->
+      <button class="sound-toggle" :class="{ off: soundOff }" @click="toggleSound" :title="soundOff ? '打开音效' : '关闭音效'">
+        {{ soundOff ? '🔇 音效关' : '🔊 音效开' }}
+      </button>
     </div>
 
     <router-view />
@@ -32,11 +46,34 @@ import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { getCurrentUser, signOut, onAuthStateChange, subscribeToProgress, unsubscribeProgress, getMySessionId, markMySessionOnline, clearMySession } from './utils/supabase'
 import { clearLocalData, syncFromCloud, getProgress } from './utils/storage'
-import { setLoginState } from './main'
+import { setLoginState, setGuestState, guestState } from './main'
+import { isMuted, toggleMuted } from './utils/sound'
 
 const router = useRouter()
 const userPhone = ref('')
+const isGuest = computed(() => guestState.value)
 const currentRoute = ref('/')
+
+// ===== 用户中心下拉菜单 =====
+const showCenterMenu = ref(false)
+const centerEl = ref(null)
+
+function onDocClickCloseMenu(e) {
+  if (showCenterMenu.value && centerEl.value && !centerEl.value.contains(e.target)) {
+    showCenterMenu.value = false
+  }
+}
+
+function goSecurity() {
+  showCenterMenu.value = false
+  router.push('/security')
+}
+
+// ===== 音效开关 =====
+const soundOff = ref(isMuted())
+function toggleSound() {
+  soundOff.value = toggleMuted()
+}
 
 // ===== 版本更新提示 =====
 const showUpdate = ref(false)
@@ -110,10 +147,13 @@ onMounted(async () => {
     await markMySessionOnline()
     subscribeToProgress(user.userId, handleRemoteUpdate)
   }
+  // 游客状态由 main.js 的 guestState (reactive) 响应式提供，无需这里恢复
 
   onAuthStateChange((u) => {
     userPhone.value = u?.phone || ''
     if (u) {
+      // 登录了就自动退出游客模式
+      setGuestState(false)
       subscribeToProgress(u.userId, handleRemoteUpdate)
     } else {
       unsubscribeProgress()
@@ -128,6 +168,7 @@ onMounted(async () => {
   // 手机端：从屏幕左缘向右滑动 = 返回上一级
   document.addEventListener('touchstart', onSwipeStart, { passive: true })
   document.addEventListener('touchend', onSwipeEnd, { passive: true })
+  document.addEventListener('click', onDocClickCloseMenu, true)
 })
 
 onUnmounted(() => {
@@ -135,6 +176,7 @@ onUnmounted(() => {
   window.removeEventListener('sw-update-available', onUpdateAvailable)
   document.removeEventListener('touchstart', onSwipeStart)
   document.removeEventListener('touchend', onSwipeEnd)
+  document.removeEventListener('click', onDocClickCloseMenu, true)
 })
 
 // ===== 手机端滑动导航：左缘右滑返回上一级，右缘左滑回到最近做题界面 =====
@@ -187,12 +229,30 @@ function swipeBlocked() {
 
 function goBackLevel() {
   if (swipeBlocked()) return
+  // 结果页：错题本/收藏夹用 sessionStorage 记录的来源精确跳回；套题/小科目 replace('/') 回首页
+  if (currentRoute.value === '/result') {
+    const returnTo = sessionStorage.getItem('quiz_return_to')
+    if (returnTo) {
+      sessionStorage.removeItem('quiz_return_to')
+      router.replace(returnTo)
+    } else {
+      router.replace('/')
+    }
+    return
+  }
+  // 错题本/收藏夹：replace('/') 回首页（首页有 quiz_home_state 记住第几步）
+  // 不用 router.back()，历史栈可能混有 /auth 等无关条目
+  if (currentRoute.value === '/wrongbook' || currentRoute.value === '/favorites') {
+    router.replace('/')
+    return
+  }
   // 首页三个步骤都在 / 路由内，右滑 = 返回上一步（由 HomeView 处理）
   if (currentRoute.value === '/') {
     window.dispatchEvent(new CustomEvent('app-swipe-back'))
     return
   }
-  if (window.history.length > 1) router.back()
+  // 其他页面：安全起见也 replace('/') 兜底，不依赖历史栈
+  router.replace('/')
 }
 
 function goLastQuiz() {
@@ -207,6 +267,13 @@ function goLastQuiz() {
 }
 
 async function logout() {
+  showCenterMenu.value = false
+  if (isGuest.value) {
+    if (!confirm('确定退出游客模式吗？本地数据将保留，但下次进入游客模式前仍为未登录状态。')) return
+    setGuestState(false)
+    router.push('/auth')
+    return
+  }
   if (!confirm('确定退出登录吗？本地进度已同步到云端，下次登录可恢复。')) return
   try {
     await signOut()
@@ -241,6 +308,88 @@ async function logout() {
 .user-phone {
   font-size: 13px;
   color: #666;
+}
+
+/* 用户中心按钮 + 下拉菜单 */
+.user-center {
+  position: relative;
+}
+
+.center-btn {
+  background: none;
+  border: 1px solid #d9d9d9;
+  color: #555;
+  font-size: 13px;
+  padding: 4px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.center-btn:hover {
+  background: #f0f7ff;
+  border-color: #a8ccf0;
+  color: #4a90d9;
+}
+
+.center-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  padding: 6px;
+  min-width: 140px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.center-item {
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: 14px;
+  color: #333;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.center-item:hover {
+  background: #f0f7ff;
+}
+
+.center-item.danger {
+  color: #ff4d4f;
+}
+
+.center-item.danger:hover {
+  background: #fff2f0;
+}
+
+/* 音效开关 */
+.sound-toggle {
+  background: none;
+  border: 1px solid #d9d9d9;
+  color: #555;
+  font-size: 13px;
+  padding: 4px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sound-toggle:hover {
+  background: #f5f5f5;
+}
+
+.sound-toggle.off {
+  color: #999;
+  border-color: #e8e8e8;
 }
 
 .logout-btn {
