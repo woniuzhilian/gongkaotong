@@ -31,4 +31,10 @@ extracted_images/
 # 题库备份文件
 questions_BACKUP_*.json
 
+# 本地设计资产与凭据（不入库、防误删）
+logo/
+更新流程.txt
+exam-quiz.rar
+软著申报材料/
+
 
