@@ -23,7 +23,7 @@
         <template v-for="it in renderItems" :key="it.key">
           <span v-if="it.type === 'caret'" class="calc-caret"></span>
           <span v-else-if="it.sup" class="calc-sup">{{ it.ch }}</span>
-          <span v-else :class="{ 'eq-mark': it.eq }">{{ it.ch }}</span>
+          <span v-else :class="{ 'eq-mark': it.eq, 'x-mark': it.isX }">{{ it.ch }}</span>
         </template>
         <span v-if="cursor >= expr.length" class="calc-caret"></span>
         <span v-if="!expr" class="calc-ph">输入算式或方程</span>
@@ -48,27 +48,14 @@
       >{{ k.t }}</button>
     </div>
     <div class="calc-tip-row">
-      <span class="calc-tip">方程：Eq.= 输入等号 → SOLVE 求 𝑥</span>
-      <button class="calc-help-btn" @click="helpOpen = true">📖 使用说明</button>
-    </div>
-
-    <!-- 透明度：按住「透明度」按钮临时隐藏计算器（透明度 0%），松手恢复原设定 -->
-    <div class="calc-opacity">
       <button
-        class="op-label"
+        class="op-label calc-hide-btn"
         :class="{ pressed: peekZero }"
         title="按住隐藏计算器，松手恢复"
         @pointerdown="startPeek"
         @contextmenu.prevent
-      >透明度</button>
-      <input
-        type="range"
-        min="0"
-        max="100"
-        :value="Math.round(opacity * 100)"
-        @input="onOpacity"
-      />
-      <span class="op-val">{{ Math.round(opacity * 100) }}%</span>
+      >🙈 隐藏</button>
+      <button class="calc-help-btn" @click="helpOpen = true">📖 使用说明</button>
     </div>
 
     <!-- 右下角缩放手柄 -->
@@ -87,9 +74,9 @@
           <p><b>π 和 𝑥</b>：<span class="hl">π</span> 插入圆周率；<span class="hl">𝑥</span> 插入变量 𝑥（解方程时使用）</p>
           <p><b>Ans 键</b>：调取上一次计算结果，如刚算出 5，按 <span class="hl">Ans + 3 =</span> 得 8</p>
           <p><b>光标编辑</b>：<span class="hl">← →</span> 移动光标，<span class="hl">DEL</span> 删光标前一位，数字和函数插入到光标处</p>
-          <p><b>解方程</b>：<span class="hl">Eq.=</span> 输入等号（绿色显示），如 <span class="hl">𝑥 Eq.= 2</span>，再按 <span class="hl">SOLVE</span> 得 <span class="hl">𝑥 = 2</span></p>
+          <p><b>解方程</b>：<span class="hl">Eq.=</span> 输入等号（绿色显示），如 <span class="hl">x Eq.= 2</span>，再按 <span class="hl">SOLVE</span> 得 <span class="hl">x = 2</span></p>
           <p><b>清空</b>：<span class="hl">AC</span> 全清；刚算完一道题按运算符会用上一次结果继续算</p>
-          <p><b>透明度</b>：底部有滑杆可调 0–100% 透明度；<b>按住「透明度」按钮</b>临时隐藏整个计算器（数字/键盘都消失），松手恢复原位——底层做题页面完全露出，不影响计算结果</p>
+          <p><b>隐藏计算器</b>：<b>按住「🙈 隐藏」按钮</b>临时隐藏整个计算器（底层做题页面完全露出），松手恢复原位，不影响计算结果</p>
         </div>
         <button class="calc-help-close" @click="helpOpen = false">知道了</button>
       </div>
@@ -149,11 +136,16 @@ const topPx = computed(() => {
 // 按住「透明度」按钮：临时把计算器透明度降到 0（看清下层题目），松手恢复原设定
 const peekZero = ref(false)
 
+// 字体/间距缩放因子：以基准宽度 320px 为 1，越大越放大
+const BASE_WIDTH = 320
+const calcScale = computed(() => Math.max(0.75, Math.min(2.0, width.value / BASE_WIDTH)))
+
 const panelStyle = computed(() => ({
   width: width.value + 'px',
   left: leftPx.value + 'px',
   top: topPx.value + 'px',
-  '--calc-alpha': String(peekZero.value ? 0 : opacity.value)
+  '--calc-alpha': String(peekZero.value ? 0 : 1),
+  '--calc-scale': calcScale.value.toFixed(3)
 }))
 
 function onOpacity(e) {
@@ -199,7 +191,8 @@ function endDrag(e) {
   window.removeEventListener('pointercancel', endDrag)
 }
 
-// ===== 缩放（右下角手柄，只调宽度，高度随内容） =====
+// ===== 缩放（右下角手柄，只拉宽度，高度由内容随 scale 自动匹配）=====
+const MIN_W = 260
 let rsState = null
 function startResize(e) {
   e.preventDefault()
@@ -211,8 +204,8 @@ function startResize(e) {
 }
 function onResizeMove(e) {
   if (!rsState || e.pointerId !== rsState.id) return
-  const maxW = Math.max(280, (window.innerWidth || 800) - 16)
-  width.value = Math.min(Math.max(260, rsState.w + e.clientX - rsState.sx), maxW)
+  const maxW = Math.max(MIN_W, (window.innerWidth || 800) - 16)
+  width.value = Math.min(Math.max(MIN_W, rsState.w + e.clientX - rsState.sx), maxW)
 }
 function endResize(e) {
   if (rsState && e.pointerId === rsState.id) {
@@ -269,7 +262,8 @@ const renderItems = computed(() => {
       continue
     }
     if (i === cur) items.push({ key: 'c', type: 'caret' })
-    items.push({ key: i, type: 'char', sup: false, ch: s[i], eq: s[i] === '=' })
+    const ch = s[i]
+    items.push({ key: i, type: 'char', sup: false, ch, eq: ch === '=', isX: ch === 'x' || ch === '\u{1D465}' })
     i++
   }
   if (cur >= s.length) items.push({ key: 'c', type: 'caret' })
@@ -343,7 +337,9 @@ function toJs(s) {
   let t = insertImplicitMul(s)
   t = t.replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-').replace(/\^/g, '**')
   t = t.replace(/(sin|cos|tan|log|ln|√)/g, (m) => FN[m])
-  t = t.replace(/π/g, 'PI').replace(/x/g, 'X')
+  // 替换所有形式的 x：普通 x / 数学斜体 𝑥 (U+1D465) / 数学粗体 𝐱 等 → 统一为 X
+  t = t.replace(/π/g, 'PI')
+  t = t.replace(/x|\u{1D465}|\u{1D44F}|\u{1D439}/gu, 'X')
   return t
 }
 
@@ -370,7 +366,7 @@ function fmt(v) {
 
 // ===== 界面键盘：7 排 × 5 列（SOLVE / Eq.= / x / ← / → / x² 为新增键） =====
 const keys = [
-  { t: 'SOLVE', solve: 1 }, { t: 'Eq.=', eqIn: 1 }, { t: '𝑥', xx: 1 }, { t: '←', move: -1 }, { t: '→', move: 1 },
+  { t: 'SOLVE', solve: 1 }, { t: 'Eq.=', eqIn: 1 }, { t: 'x', xx: 1 }, { t: '←', move: -1 }, { t: '→', move: 1 },
   { t: 'sin', fn: 1, ins: 'sin(' }, { t: 'cos', fn: 1, ins: 'cos(' }, { t: 'tan', fn: 1, ins: 'tan(' }, { t: '(', op: 1 }, { t: ')', op: 1 },
   { t: 'log', fn: 1, ins: 'log(' }, { t: 'ln', fn: 1, ins: 'ln(' }, { t: '√', fn: 1, ins: '√(' }, { t: 'x²', sq: 1 }, { t: 'xⁿ', op: 1, ins: '^' },
   { t: '7' }, { t: '8' }, { t: '9' }, { t: '÷', op: 1 }, { t: 'π', pi: 1 },
@@ -557,7 +553,7 @@ onUnmounted(() => {
   border: 1px solid rgba(0, 0, 0, calc(var(--calc-alpha, 0.5) * 0.15));
   border-radius: 12px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, calc(var(--calc-alpha, 0.5) * 0.18));
-  padding: 8px 10px 10px;
+  padding: calc(8px * var(--calc-scale, 1)) calc(10px * var(--calc-scale, 1)) calc(10px * var(--calc-scale, 1));
   user-select: none;
   -webkit-user-select: none;
   touch-action: none;
@@ -574,27 +570,29 @@ onUnmounted(() => {
   opacity: var(--calc-alpha, 0.5);
 }
 
-/* 按住「透明度」按钮期间（.peeking）：除这个按钮外全部隐藏——
-   标题行、显示框、键盘、提示语、滑杆与百分比、缩放手柄都不显示，
-   只留「透明度」按钮本身，松手即全部恢复 */
-.calc-float.peeking .calc-titlebar,
-.calc-float.peeking .calc-opacity > *:not(.op-label) {
+/* 按住「隐藏」按钮期间（.peeking）：整个计算器面板淡出 */
+.calc-float.peeking {
   opacity: 0;
+  transition: opacity 0.08s;
+}
+.calc-float:not(.peeking) {
+  transition: opacity 0.12s;
 }
 
 .calc-titlebar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: calc(8px * var(--calc-scale, 1));
   cursor: grab;
   touch-action: none;
-  padding: 2px 0 6px;
+  padding: 2px 0 calc(6px * var(--calc-scale, 1));
+  flex-shrink: 0;
 }
 
 .calc-grip {
-  width: 26px;
-  height: 10px;
-  border-radius: 5px;
+  width: calc(26px * var(--calc-scale, 1));
+  height: calc(10px * var(--calc-scale, 1));
+  border-radius: calc(5px * var(--calc-scale, 1));
   background: rgba(0, 0, 0, 0.12);
   position: relative;
   flex-shrink: 0;
@@ -605,27 +603,27 @@ onUnmounted(() => {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: 12px;
-  height: 2px;
-  border-radius: 2px;
+  width: calc(12px * var(--calc-scale, 1));
+  height: calc(2px * var(--calc-scale, 1));
+  border-radius: calc(2px * var(--calc-scale, 1));
   background: rgba(0, 0, 0, 0.35);
 }
 
 .calc-name {
-  font-size: 13px;
+  font-size: calc(13px * var(--calc-scale, 1));
   font-weight: 600;
   color: #333;
 }
 
 .calc-close {
   margin-left: auto;
-  width: 24px;
-  height: 24px;
+  width: calc(24px * var(--calc-scale, 1));
+  height: calc(24px * var(--calc-scale, 1));
   border: none;
-  border-radius: 6px;
+  border-radius: calc(6px * var(--calc-scale, 1));
   background: rgba(0, 0, 0, 0.08);
   color: #555;
-  font-size: 16px;
+  font-size: calc(16px * var(--calc-scale, 1));
   line-height: 1;
   cursor: pointer;
   flex-shrink: 0;
@@ -638,15 +636,16 @@ onUnmounted(() => {
   background: rgba(0, 0, 0, 0.05);
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 8px;
-  padding: 6px 8px;
+  padding: calc(6px * var(--calc-scale, 1)) calc(8px * var(--calc-scale, 1));
   text-align: right;
   overflow: hidden;
+  flex-shrink: 0;
 }
 .calc-expr {
-  font-size: 12px;
+  font-size: calc(12px * var(--calc-scale, 1));
   color: #666;
-  min-height: 18px;
-  line-height: 16px;
+  min-height: calc(18px * var(--calc-scale, 1));
+  line-height: calc(16px * var(--calc-scale, 1));
   white-space: nowrap;
   overflow: hidden;
   text-align: left;
@@ -656,6 +655,12 @@ onUnmounted(() => {
 .eq-mark {
   color: #12a150;
   font-weight: 700;
+}
+/* x 变量标记：斜体 → 和正体乘号 × 视觉区分 */
+.x-mark {
+  font-style: italic;
+  color: #0a6b3d;
+  font-weight: 600;
 }
 /* 幂上标：^ 后内容以缩小上移的字体显示（5^2 → 5²） */
 .calc-sup {
@@ -667,7 +672,7 @@ onUnmounted(() => {
 .calc-caret {
   display: inline-block;
   width: 1px;
-  height: 13px;
+  height: calc(13px * var(--calc-scale, 1));
   background: #4a90d9;
   vertical-align: -2px;
   animation: calcBlink 1s step-end infinite;
@@ -677,10 +682,10 @@ onUnmounted(() => {
 }
 .calc-ph {
   color: #b0b0b0;
-  font-size: 11px;
+  font-size: calc(11px * var(--calc-scale, 1));
 }
 .calc-res {
-  font-size: 20px;
+  font-size: calc(20px * var(--calc-scale, 1));
   font-weight: 700;
   color: #222;
   white-space: nowrap;
@@ -692,16 +697,16 @@ onUnmounted(() => {
 .calc-keys {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 5px;
-  margin-top: 8px;
+  gap: calc(5px * var(--calc-scale, 1));
+  margin-top: calc(8px * var(--calc-scale, 1));
 }
 .calc-key {
-  height: 32px;
+  height: calc(32px * var(--calc-scale, 1));
   border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.75);
   color: #222;
-  font-size: 14px;
+  font-size: calc(14px * var(--calc-scale, 1));
   font-family: ui-monospace, Menlo, Consolas, monospace;
   cursor: pointer;
   padding: 0;
@@ -714,7 +719,7 @@ onUnmounted(() => {
   transform: scale(0.94);      /* 按下即时视觉反馈，让用户知道按到了 */
 }
 .calc-key.fn {
-  font-size: 12px;
+  font-size: calc(12px * var(--calc-scale, 1));
   color: #4a6a8a;
 }
 .calc-key.op {
@@ -728,32 +733,33 @@ onUnmounted(() => {
   color: #0a6b3d;
   background: rgba(15, 220, 120, 0.14);
   font-weight: 700;
+  font-style: italic;  /* 斜体 x → 和正体乘号 × 视觉区分 */
 }
 .calc-key.sq {
   color: #4a6a8a;
-  font-size: 12px;
+  font-size: calc(12px * var(--calc-scale, 1));
 }
 .calc-key.util {
   color: #a04040;
-  font-size: 12px;
+  font-size: calc(12px * var(--calc-scale, 1));
 }
 /* 光标键 */
 .calc-key.cursor {
-  font-size: 15px;
+  font-size: calc(15px * var(--calc-scale, 1));
   color: #4a6a8a;
 }
 /* Eq.=：绿色文字，用于在等式中输入等号 */
 .calc-key.eqin {
   color: #12a150;
   font-weight: 700;
-  font-size: 12px;
+  font-size: calc(12px * var(--calc-scale, 1));
 }
 /* SOLVE：方程求解键 */
 .calc-key.solve {
   color: #0a6b3d;
   background: rgba(15, 220, 120, 0.14);
   font-weight: 700;
-  font-size: 11px;
+  font-size: calc(11px * var(--calc-scale, 1));
 }
 .calc-key.eq {
   background: #4a90d9;
@@ -766,29 +772,30 @@ onUnmounted(() => {
 }
 
 .calc-tip-row {
-  margin-top: 6px;
+  margin-top: calc(5px * var(--calc-scale, 1));
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: calc(8px * var(--calc-scale, 1));
+  flex-shrink: 0;
 }
-.calc-tip-row .calc-tip {
-  font-size: 11px;
-  color: #888;
-  line-height: 1.4;
-}
-.calc-help-btn {
-  font-size: 11px;
-  padding: 2px 8px;
+.calc-help-btn,
+.calc-hide-btn {
+  font-size: calc(12px * var(--calc-scale, 1));
+  padding: calc(3px * var(--calc-scale, 1)) calc(10px * var(--calc-scale, 1));
   border: 1px solid #d0d0d0;
-  border-radius: 4px;
+  border-radius: calc(4px * var(--calc-scale, 1));
   background: rgba(255, 255, 255, 0.85);
-  color: #4a90d9;
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
+  font-family: inherit;
 }
+.calc-help-btn { color: #4a90d9; }
+.calc-hide-btn { color: #888; }
 .calc-help-btn:active { background: #e6f2ff; }
+.calc-hide-btn:active { background: #f0f0f0; }
+.calc-hide-btn.pressed { background: #ffe0e0; color: #c04040; }
 
 /* 使用说明弹窗 */
 .calc-help-mask {
@@ -845,61 +852,16 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
-/* 透明度行：整行始终可见（含滑杆），不随透明度变化 */
-.calc-opacity {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
-}
-/* 「透明度」按住按钮：按住 → 计算器临时全透明，松手恢复 */
-.op-label {
-  font-size: 12px;
-  font-family: inherit;
-  color: #666;
-  white-space: nowrap;
-  border: 1px solid rgba(0, 0, 0, 0.15);
-  background: rgba(0, 0, 0, 0.04);
-  border-radius: 6px;
-  padding: 2px 8px;
-  line-height: 1.4;
-  cursor: pointer;
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-touch-callout: none;
-  touch-action: none;
-}
-.op-label.pressed {
-  background: rgba(74, 144, 217, 0.2);
-  border-color: rgba(74, 144, 217, 0.6);
-  color: #2b6cb0;
-}
-.calc-opacity input[type='range'] {
-  flex: 1;
-  min-width: 0;
-  accent-color: #4a90d9;
-  touch-action: auto;
-}
-.op-val {
-  font-size: 12px;
-  color: #333;
-  font-weight: 600;
-  width: 36px;
-  text-align: right;
-  font-family: ui-monospace, Menlo, Consolas, monospace;
-}
-
-/* 右下角缩放手柄 */
+/* 右下角缩放手柄：双向拉伸（宽+高都能调） */
 .calc-resize {
   position: absolute;
   right: 3px;
   bottom: 3px;
-  width: 16px;
-  height: 16px;
+  width: calc(18px * var(--calc-scale, 1));
+  height: calc(18px * var(--calc-scale, 1));
   cursor: nwse-resize;
   touch-action: none;
+  z-index: 2;
   background:
     linear-gradient(
       135deg,
@@ -911,4 +873,5 @@ onUnmounted(() => {
     );
   border-bottom-right-radius: 10px;
 }
+.calc-tip-row { flex-shrink: 0; }
 </style>

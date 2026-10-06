@@ -277,7 +277,7 @@ export function clearFavorites(bigSubject) {
 // ===== 计算器设置（透明度 / 大小 / 位置）=====
 // 结构：{ opacity: 0.5, width: 320, x: 0.6, y: 0.15 }
 // x/y 用「占视口宽高的比例」存储，换设备（屏幕尺寸不同）也能落在相对一致的位置
-export const CALC_DEFAULTS = { opacity: 0.5, width: 320, x: 0.55, y: 0.12 }
+export const CALC_DEFAULTS = { opacity: 1, width: 320, height: 460, x: 0.55, y: 0.12 }
 
 export function getCalculatorSettings() {
   const s = get(STORAGE_KEYS.SETTINGS, {})
