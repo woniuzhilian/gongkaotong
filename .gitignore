@@ -1429,3 +1429,6 @@ exam-quiz/zoom.py
 /exam-quiz/专业基础_第3批.json
 /exam-quiz/需配图题目清单.xlsx
 /exam-quiz/题目配图_全部354题.zip
+/exam-quiz/*.py
+/exam-quiz/*.cjs
+/exam-quiz/*.mjs
