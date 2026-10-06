@@ -55,7 +55,10 @@
         @pointerdown="startPeek"
         @contextmenu.prevent
       >🙈 隐藏</button>
-      <button class="calc-help-btn" @click="helpOpen = true">📖 使用说明</button>
+      <div class="calc-tip-center">
+        <button class="calc-help-btn" @click="helpOpen = true">📖 使用说明</button>
+      </div>
+      <span class="calc-tip-right"></span>
     </div>
 
     <!-- 右下角缩放手柄 -->
@@ -775,9 +778,16 @@ onUnmounted(() => {
   margin-top: calc(5px * var(--calc-scale, 1));
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: calc(8px * var(--calc-scale, 1));
   flex-shrink: 0;
+}
+.calc-tip-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+.calc-tip-right {
+  flex: 0 0 calc(60px * var(--calc-scale, 1));
 }
 .calc-help-btn,
 .calc-hide-btn {
