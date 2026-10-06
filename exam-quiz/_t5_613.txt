@@ -1,2 +1,0 @@
-'设圆周曲线$L:x^{2}+y^{2} =1$取逆时针方向,则对坐标的曲线积分,$\\int ydx;xdy$的$L x^{2}:y^{2}$值等于:( ).'
-'坐标曲线积分的计算. 坐标曲线的积分通常转化为参数方程的形式求解，因为曲线时圆，引入参数$\\theta$，令$\\begin{cases}x=cos\\theta\\\\y=sin\\theta\\end{cases}(0\\leq\\theta\\leq2\\pi)$，注意为逆时针，所以$\\theta$时从0到$2\\pi$，用公式得$\\int_L\\frac{ydx-xdy}{x^2+y^2}=\\int_0^{2\\pi}sin\\theta dcos\\theta-cos\\theta dsin\\theta=-\\int_0^{2\\pi}(sin^2\\theta+cos^2\\theta)d\\theta=-2\\pi$。'
