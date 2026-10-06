@@ -220,7 +220,8 @@ async function submitReport() {
     await submitFeedback(
       questionId,
       selectedParts.value,
-      reportText.value
+      reportText.value,
+      q.bigSubject || null
     )
     alert('反馈提交成功，感谢您的帮助！')
     showReportModal.value = false
@@ -292,6 +293,8 @@ let dragMoved = false
 function onContentClick(e) {
   const img = e.target && e.target.closest ? e.target.closest('img') : null
   if (!img || !img.src) return
+  // 选项里的配图不放大（放大遮罩会挡住选项，导致无法选中）
+  if (img.closest('.opt-content')) return
   zoomSrc.value = img.src
   zoomScale.value = 1
   panX.value = 0

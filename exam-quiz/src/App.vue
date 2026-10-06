@@ -222,8 +222,8 @@ function onSwipeEnd(e) {
 
 function swipeBlocked() {
   if (showUpdate.value) return true
-  // 有弹窗/图片放大遮罩时不触发滑动导航
-  if (document.querySelector('.img-zoom-mask, .report-mask, .picker-mask, .update-mask, .analysis-mask, .scratch-mask')) return true
+  // 有弹窗/图片放大遮罩/草稿/计算器时不触发滑动导航
+  if (document.querySelector('.img-zoom-mask, .report-mask, .picker-mask, .update-mask, .analysis-mask, .scratch-mask, .calc-float.open')) return true
   return false
 }
 

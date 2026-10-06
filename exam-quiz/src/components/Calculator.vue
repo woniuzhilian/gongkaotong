@@ -42,10 +42,15 @@
           solve: k.solve, eqin: k.eqIn, cursor: k.move,
           util: k.ac || k.del || k.ans
         }"
-        @click="press(k)"
+        @pointerdown="press(k)"
+        @pointerup.prevent
+        @click.prevent
       >{{ k.t }}</button>
     </div>
-    <div class="calc-tip">方程：Eq.= 输入等号 → SOLVE 求 x</div>
+    <div class="calc-tip-row">
+      <span class="calc-tip">方程：Eq.= 输入等号 → SOLVE 求 𝑥</span>
+      <button class="calc-help-btn" @click="helpOpen = true">📖 使用说明</button>
+    </div>
 
     <!-- 透明度：按住「透明度」按钮临时隐藏计算器（透明度 0%），松手恢复原设定 -->
     <div class="calc-opacity">
@@ -68,6 +73,27 @@
 
     <!-- 右下角缩放手柄 -->
     <div class="calc-resize" @pointerdown="startResize"></div>
+
+    <!-- 使用说明弹窗 -->
+    <div v-if="helpOpen" class="calc-help-mask" @click.self="helpOpen = false">
+      <div class="calc-help-dialog">
+        <div class="calc-help-title">计算器使用说明</div>
+        <div class="calc-help-body">
+          <p><b>基本运算</b>：<span class="hl">+ − × ÷</span> 加减乘除，输入算式后按 <span class="hl">=</span> 求值</p>
+          <p><b>三角函数</b>：<span class="hl">sin cos tan</span> 按角度制计算（sin 30° = 0.5），按完函数自动补左括号 <span class="hl">(</span>，算完记得补 <span class="hl">)</span></p>
+          <p><b>幂运算</b>：按 <span class="hl">xⁿ</span> 再输入指数，如 <span class="hl">2 xⁿ 3 =</span> 得 8；或按 <span class="hl">x²</span> 快速平方</p>
+          <p><b>开方</b>：<span class="hl">√</span> 后输入被开方数，如 <span class="hl">√ 9 =</span> 得 3</p>
+          <p><b>对数</b>：<span class="hl">log</span> 常用对数（以 10 为底）；<span class="hl">ln</span> 自然对数（以 e 为底）</p>
+          <p><b>π 和 𝑥</b>：<span class="hl">π</span> 插入圆周率；<span class="hl">𝑥</span> 插入变量 𝑥（解方程时使用）</p>
+          <p><b>Ans 键</b>：调取上一次计算结果，如刚算出 5，按 <span class="hl">Ans + 3 =</span> 得 8</p>
+          <p><b>光标编辑</b>：<span class="hl">← →</span> 移动光标，<span class="hl">DEL</span> 删光标前一位，数字和函数插入到光标处</p>
+          <p><b>解方程</b>：<span class="hl">Eq.=</span> 输入等号（绿色显示），如 <span class="hl">𝑥 Eq.= 2</span>，再按 <span class="hl">SOLVE</span> 得 <span class="hl">𝑥 = 2</span></p>
+          <p><b>清空</b>：<span class="hl">AC</span> 全清；刚算完一道题按运算符会用上一次结果继续算</p>
+          <p><b>透明度</b>：底部有滑杆可调 0–100% 透明度；<b>按住「透明度」按钮</b>临时隐藏整个计算器（数字/键盘都消失），松手恢复原位——底层做题页面完全露出，不影响计算结果</p>
+        </div>
+        <button class="calc-help-close" @click="helpOpen = false">知道了</button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -204,8 +230,10 @@ const cursor = ref(0)          // 光标位置（0 ~ expr.length）
 const result = ref('0')
 const ans = ref(NaN)           // 上一次运算/求解结果（Ans 键调取）
 const justEvaluated = ref(false) // 刚按过 = / SOLVE：再输入数字则开新式子
-// 把算式拆成"显示项"：^ 本身隐藏，其后紧跟的幂内容用上标渲染（5^2 → 5²）
-// 幂范围：^ 后若紧跟 ( 则整对括号内为上标；否则向后连续取 [0-9xπ.] 字符为上标
+let lastPressAt = 0             // 按键防重入：pointerdown 快速连按时防双触发
+const helpOpen = ref(false)     // 使用说明弹窗
+// 把算式拆成"显示项"：^ 后有幂内容则隐藏 ^、幂用上标渲染（5^2 → 5²）；
+// ^ 后没内容时单独显示 ^，让用户知道按到了
 const renderItems = computed(() => {
   const s = expr.value
   const cur = cursor.value
@@ -214,7 +242,8 @@ const renderItems = computed(() => {
   while (i < s.length) {
     if (s[i] === '^') {
       if (cur === i) items.push({ key: 'c', type: 'caret' })
-      i++                       // 跳过 ^，^ 本身不显示
+      const caretIdx = i
+      i++
       const start = i
       if (s[i] === '(') {
         let depth = 0
@@ -227,9 +256,15 @@ const renderItems = computed(() => {
       } else {
         while (i < s.length && /[0-9xπ.]/.test(s[i])) i++
       }
-      for (let k = start; k < i; k++) {
-        if (k === cur) items.push({ key: 'c', type: 'caret' })
-        items.push({ key: k, type: 'char', sup: true, ch: s[k] })
+      if (i > start) {
+        // 有幂内容 → 隐藏 ^，幂用上标渲染
+        for (let k = start; k < i; k++) {
+          if (k === cur) items.push({ key: 'c', type: 'caret' })
+          items.push({ key: k, type: 'char', sup: true, ch: s[k] })
+        }
+      } else {
+        // ^ 后无幂内容 → 显示 ^ 本身，让用户知道按到了
+        items.push({ key: caretIdx, type: 'char', sup: false, ch: '^' })
       }
       continue
     }
@@ -335,9 +370,9 @@ function fmt(v) {
 
 // ===== 界面键盘：7 排 × 5 列（SOLVE / Eq.= / x / ← / → / x² 为新增键） =====
 const keys = [
-  { t: 'SOLVE', solve: 1 }, { t: 'Eq.=', eqIn: 1 }, { t: 'x', xx: 1 }, { t: '←', move: -1 }, { t: '→', move: 1 },
+  { t: 'SOLVE', solve: 1 }, { t: 'Eq.=', eqIn: 1 }, { t: '𝑥', xx: 1 }, { t: '←', move: -1 }, { t: '→', move: 1 },
   { t: 'sin', fn: 1, ins: 'sin(' }, { t: 'cos', fn: 1, ins: 'cos(' }, { t: 'tan', fn: 1, ins: 'tan(' }, { t: '(', op: 1 }, { t: ')', op: 1 },
-  { t: 'log', fn: 1, ins: 'log(' }, { t: 'ln', fn: 1, ins: 'ln(' }, { t: '√', fn: 1, ins: '√(' }, { t: 'x²', sq: 1 }, { t: '^', op: 1 },
+  { t: 'log', fn: 1, ins: 'log(' }, { t: 'ln', fn: 1, ins: 'ln(' }, { t: '√', fn: 1, ins: '√(' }, { t: 'x²', sq: 1 }, { t: 'xⁿ', op: 1, ins: '^' },
   { t: '7' }, { t: '8' }, { t: '9' }, { t: '÷', op: 1 }, { t: 'π', pi: 1 },
   { t: '4' }, { t: '5' }, { t: '6' }, { t: '×', op: 1 }, { t: 'AC', ac: 1 },
   { t: '1' }, { t: '2' }, { t: '3' }, { t: '−', op: 1 }, { t: 'DEL', del: 1 },
@@ -354,6 +389,11 @@ function applyAfterEval(isOp) {
 }
 
 function press(k) {
+  // 防重入：pointerdown 在某些设备上可能被同时派发多次（touch+pen），
+  // 或 iOS Safari 快速连按时 pointerdown + click 都触发
+  const now = Date.now()
+  if (now - lastPressAt < 60) return   // 60ms 内同一按键只触发一次
+  lastPressAt = now
   if (k.ac) { resetAll(); keepCursorInView(); return }
   if (k.del) { backspace(); return }
   if (k.eq) { doEval(); return }
@@ -491,9 +531,16 @@ onMounted(() => {
   window.addEventListener('keydown', onKeyInput)
 })
 
+// 计算器打开时给 body 挂 calc-open 类：屏蔽底层做题页面的所有按钮
+// （防止使用计算器时不小心按到下层翻页/提交等按钮）
+watch(() => props.visible, (v) => {
+  document.body.classList.toggle('calc-open', v)
+})
+
 onUnmounted(() => {
   window.removeEventListener('resize', onVpResize)
   window.removeEventListener('keydown', onKeyInput)
+  document.body.classList.remove('calc-open')   // 兜底：卸载时确保移除
   if (saveTimer) clearTimeout(saveTimer)
   endPeek()   // 兜底：卸载时移除可能在监听中的松手事件
 })
@@ -522,7 +569,7 @@ onUnmounted(() => {
    保证调到 0% 后仍能找到拖动条调回来 */
 .calc-display,
 .calc-keys,
-.calc-tip,
+.calc-tip-row,
 .calc-resize {
   opacity: var(--calc-alpha, 0.5);
 }
@@ -658,9 +705,13 @@ onUnmounted(() => {
   font-family: ui-monospace, Menlo, Consolas, monospace;
   cursor: pointer;
   padding: 0;
+  touch-action: none;           /* 彻底禁止浏览器手势（scroll/pan/zoom）干扰按键事件 */
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.05s;
 }
 .calc-key:active {
   background: #d8e9ff;
+  transform: scale(0.94);      /* 按下即时视觉反馈，让用户知道按到了 */
 }
 .calc-key.fn {
   font-size: 12px;
@@ -714,12 +765,84 @@ onUnmounted(() => {
   background: #357abd;
 }
 
-.calc-tip {
+.calc-tip-row {
   margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.calc-tip-row .calc-tip {
   font-size: 11px;
   color: #888;
-  text-align: center;
   line-height: 1.4;
+}
+.calc-help-btn {
+  font-size: 11px;
+  padding: 2px 8px;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.85);
+  color: #4a90d9;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.calc-help-btn:active { background: #e6f2ff; }
+
+/* 使用说明弹窗 */
+.calc-help-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 3200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.calc-help-dialog {
+  background: #fff;
+  border-radius: 12px;
+  max-width: 420px;
+  width: 100%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+.calc-help-title {
+  font-size: 16px;
+  font-weight: 600;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid #eee;
+  color: #222;
+}
+.calc-help-body {
+  padding: 14px 20px;
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.8;
+  color: #333;
+}
+.calc-help-body p { margin: 6px 0; }
+.calc-help-body .hl {
+  background: #f0f6ff;
+  color: #2b6cb0;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+.calc-help-close {
+  margin: 8px 20px 16px;
+  padding: 8px 0;
+  background: #4a90d9;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
 }
 
 /* 透明度行：整行始终可见（含滑杆），不随透明度变化 */

@@ -87,10 +87,10 @@ watch(() => props.question, () => { showKnowledge.value = false })
 
 const isCorrect = computed(() => props.userAnswer === props.question.answer)
 
-// 知识点扩展：仅概念题且已为该题单独编写过内容时才可用（不设科目级兜底，避免出现与本题无关的内容）
+// 知识点扩展：为该题单独编写过内容时就可用
 const knowledgeHtml = computed(() => {
   const q = props.question
-  if (!q || q.qtype !== 'concept') return ''
+  if (!q) return ''
   return knowledgeExt['q:' + q.id] || ''
 })
 const hasKnowledge = computed(() => !!knowledgeHtml.value)

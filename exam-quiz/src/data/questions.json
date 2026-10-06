@@ -1,4 +1,4 @@
-[
+﻿[
  {
   "year": "2013",
   "smallSubject": "向量代数与空间解析几何",
@@ -7382,13 +7382,13 @@
  {
   "year": "2018",
   "smallSubject": "无穷级数",
-  "question": "函数$f(x)=ax(a >0,a \\neq1)$的麦克劳林展开式的前三项是:( ).",
-  "A": "$1+xln a+ 1 x^{2}$",
-  "B": "$1+xln a+ lna x^{2} 2 2$",
-  "C": "$1+xln a+ (ln a)2 x^{2}$",
-  "D": "$1+ x + x^{2}$",
+  "question": "函数$f(x)=a^{x}(a >0,a \\neq1)$的麦克劳林展开式的前三项是:( ).",
+  "A": "$1+x\\ln a+\\frac{1}{2}x^{2}$",
+  "B": "$1+x+\\frac{x^{2}}{2}$",
+  "C": "$1+x\\ln a+\\frac{(\\ln a)^{2}}{2}x^{2}$",
+  "D": "$1+x\\ln a+(\\ln a)^{2}x^{2}$",
   "answer": "C",
-  "analysis": "函数的麦克劳林展开形式. 函数$f(x)=a^x=e^{lna^x}=e^{xlna}=\\sum_{0}^{\\infty}\\frac{(xlna)^n}{n!}$在通项中带入$n=0,1,2$即为前3项。",
+  "analysis": "$a^{x}=e^{x\\ln a}$，由$e^{u}=\\sum_{n=0}^{\\infty}\\frac{u^{n}}{n!}$，令$u=x\\ln a$得：$a^{x}=1+x\\ln a+\\frac{(\\ln a)^{2}}{2}x^{2}+o(x^{2})$。",
   "id": 496,
   "bigSubject": "公共基础",
   "yearQnum": 17,
@@ -27603,7 +27603,7 @@
   "year": "2022",
   "yearQnum": 60,
   "smallSubject": "地基处理",
-  "question": "换填垫层处理方法中换填的厚度不小于（　　）。",
+  "question": "换填垫层处理方法中换填的厚度不大于（　　）。",
   "A": "1.5m",
   "B": "2.0m",
   "C": "3.0m",

@@ -39,7 +39,7 @@
 
     <button class="scratch-close" title="退出草稿" @click="$emit('close')">×</button>
 
-    <div class="scratch-bar">
+    <div class="scratch-bar" :class="{ collapsed: barCollapsed }">
       <div class="eraser-tip" v-if="tool === 'eraser'">
         橡皮擦：{{ eraserMode === 'object' ? '按对象擦除 · 点中哪一笔就删掉整笔' : '连续擦除 · 划过即擦掉笔迹' }}（长按图标切换）
       </div>
@@ -102,6 +102,11 @@
         ></button>
       </div>
     </div>
+
+    <!-- 工具栏收起/展开箭头（在 scratch-bar 上方） -->
+    <button class="scratch-toggle" @click="barCollapsed = !barCollapsed" :title="barCollapsed ? '展开工具栏' : '收起工具栏'">
+      <span class="toggle-arrow">{{ barCollapsed ? '▲' : '▼' }}</span>
+    </button>
   </div>
 </template>
 
@@ -124,6 +129,7 @@ const eraserMode = ref('object')
 const color = ref('#222222')
 const size = ref(4)
 const strokes = shallowRef([])   // 笔画含大量坐标点，避免深层响应式开销
+const barCollapsed = ref(false)   // 工具栏是否收起
 
 const tools = [
   { key: 'pen', icon: '✏️', label: '画笔' },
@@ -177,20 +183,35 @@ let penActive = false     // 手写笔是否正在书写
 let lastPenTime = 0       // 手写笔最后活动时间（用于笔离开后的短暂防误触）
 
 // 是否应忽略这根手指（手写笔刚用完的短暂间隔内，忽略手指/手掌触摸防止误触）
+// 若 localStorage 里有 scratch_pen_detected 标记（设备曾检测到 Apple Pencil），则手指永久忽略
 function shouldIgnoreTouch(e) {
   if (e.pointerType !== 'touch') return false
+  if (localStorage.getItem('scratch_pen_detected')) return true
   return penActive || Date.now() - lastPenTime < 800
 }
 
-// 草稿打开时：除草稿遮罩与计算器浮窗外的元素一律不接收指针/点击事件。
-// CSS 的 pointer-events 在 iPad 上仍可能让底层按钮被选中（手写笔拖画时会把
-// 「← 上一题」的文字选中并弹出系统菜单），这里再用捕获阶段彻底拦截兜底。
-function globalGuard(e) {
-  if (!props.visible) return
+// ===== iPad 断笔修复：草稿打开时捕获阶段拦截底层事件 =====
+// iPad 上用 Apple Pencil 拖画时，笔尖附近的 pointerdown/click 会选中底层文字
+// 并弹出系统「拷贝/查询/翻译」菜单，导致笔画被断开。用捕获阶段 global 拦截兜底。
+function onGlobalCapture(e) {
+  // 草稿画布(.scratch-canvas)、覆盖层(.scratch-overlay)、工具栏(.scratch-bar)、关闭按钮(.scratch-close)、
+  // 收起箭头(.scratch-toggle)、提示语(.scratch-hint)、以及计算器(.calc-float) → 放行
   const t = e.target
-  if (t && t.closest && (t.closest('.scratch-mask') || t.closest('.calc-float'))) return
-  e.stopPropagation()
-  if (e.cancelable) e.preventDefault()
+  if (t && t.closest && (
+    t.closest('.scratch-canvas') ||
+    t.closest('.scratch-overlay') ||
+    t.closest('.scratch-bar') ||
+    t.closest('.scratch-close') ||
+    t.closest('.scratch-toggle') ||
+    t.closest('.scratch-hint') ||
+    t.closest('.calc-float')
+  )) return  // 草稿层内部的元素，正常派发
+
+  // 底层元素的 pointerdown/click/dblclick/selectstart/contextmenu/touchstart 一律阻止
+  if (['pointerdown','click','dblclick','selectstart','contextmenu','touchstart'].includes(e.type)) {
+    if (e.cancelable) e.preventDefault()
+    e.stopPropagation()
+  }
 }
 
 // ===== 画布尺寸（按设备像素比放大，避免模糊） =====
@@ -319,6 +340,10 @@ function onPointerDown(e) {
   if (e.pointerType === 'pen') {
     penActive = true
     lastPenTime = Date.now()
+    // 第一次检测到手写笔，写入 localStorage，以后该设备手指一律不落笔
+    if (!localStorage.getItem('scratch_pen_detected')) {
+      try { localStorage.setItem('scratch_pen_detected', '1') } catch (err) {}
+    }
   }
   e.preventDefault()
   const el = canvasEl.value
@@ -610,11 +635,20 @@ function lockScroll(lock) {
     // 关掉根元素的横向 overscroll，避免浏览器把边缘划动当成「返回上一页」
     document.documentElement.style.overscrollBehaviorX = 'none'
     document.body.style.overscrollBehaviorX = 'none'
+    // iPad 断笔修复：捕获阶段全局拦截
+    for (const type of ['pointerdown', 'click', 'dblclick', 'selectstart', 'contextmenu']) {
+      document.addEventListener(type, onGlobalCapture, true)
+    }
+    document.addEventListener('touchstart', onGlobalCapture, { capture: true, passive: false })
   } else {
     document.body.style.overflow = ''
     document.body.style.paddingRight = prevPaddingRight
     document.documentElement.style.overscrollBehaviorX = ''
     document.body.style.overscrollBehaviorX = ''
+    for (const type of ['pointerdown', 'click', 'dblclick', 'selectstart', 'contextmenu']) {
+      document.removeEventListener(type, onGlobalCapture, true)
+    }
+    document.removeEventListener('touchstart', onGlobalCapture, { capture: true, passive: false })
   }
 }
 
@@ -664,21 +698,10 @@ function onResize() {
 
 onMounted(() => {
   window.addEventListener('resize', onResize)
-  // 清理旧版残留：手写笔检测不再持久化，纯动态（pendingPenDetected 也清掉）
-  try { localStorage.removeItem('scratch_pen_detected') } catch (err) {}
-  // 草稿打开时：捕获阶段拦掉草稿遮罩外的指针与选中事件（防止手写笔拖画时选中底层文字弹出系统菜单）
-  for (const type of ['pointerdown', 'click', 'dblclick', 'selectstart', 'contextmenu']) {
-    document.addEventListener(type, globalGuard, true)
-  }
-  document.addEventListener('touchstart', globalGuard, { capture: true, passive: false })
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', onResize)
-  for (const type of ['pointerdown', 'click', 'dblclick', 'selectstart', 'contextmenu']) {
-    document.removeEventListener(type, globalGuard, true)
-  }
-  document.removeEventListener('touchstart', globalGuard, { capture: true, passive: false })
   if (lpTimer) { clearTimeout(lpTimer); lpTimer = null }
   lockScroll(false)
 })
@@ -783,9 +806,42 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.94);
   border-top: 1px solid #e6e6e6;
   box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.08);
+  transition: transform 0.22s ease, opacity 0.18s ease;
   /* 长按橡皮擦图标时不要弹出系统菜单 */
   -webkit-touch-callout: none;
   user-select: none;
+}
+/* 工具栏收起：向下滑出屏幕 */
+.scratch-bar.collapsed {
+  transform: translateY(100%);
+  opacity: 0.3;
+}
+/* 收起/展开箭头按钮 */
+.scratch-toggle {
+  position: absolute;
+  bottom: calc(100% + 4px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  width: 52px;
+  height: 26px;
+  padding: 0;
+  background: #e8eef5;
+  border: 1px solid #c0d0e0;
+  border-radius: 13px;
+  cursor: pointer;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, transform 0.15s;
+}
+.scratch-toggle:hover { background: #d6e2f0; }
+.scratch-toggle:active { background: #c3d3e6; transform: translateX(-50%) scale(0.95); }
+.toggle-arrow {
+  font-size: 13px;
+  color: #4a6fa0;
+  font-weight: bold;
+  line-height: 1;
 }
 
 .bar-row {
