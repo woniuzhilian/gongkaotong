@@ -1431,3 +1431,11 @@ exam-quiz/zoom.py
 /exam-quiz/*.py
 /exam-quiz/*.cjs
 /exam-quiz/*.mjs
+/missing_images/
+/missing_questions/
+/unmatched_images/
+/_move_backup/
+/*.json
+/*.txt
+/*.tsv
+/*.png
