@@ -1421,7 +1421,6 @@ exam-quiz/zoom.py
 /*.py
 /*.cjs
 /*.mjs
-/README.md
 /package.json
 /package-lock.json
 /exam-quiz/专业基础_第1批.json
