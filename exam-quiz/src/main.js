@@ -54,6 +54,8 @@ router.beforeEach(async (to) => {
     await initAuth()
   }
   if (!to.meta.public && !isLoggedIn && !guestState.value) {
+    // 记录来源页面，登录成功或进入游客后跳回
+    sessionStorage.setItem('auth_return_to', to.fullPath)
     return { path: '/auth' }
   }
   // 已登录用户访问登录页，直接进首页；游客访问登录页允许（游客想转成正常用户登录）

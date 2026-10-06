@@ -24,8 +24,9 @@
     <canvas ref="overlayEl" class="scratch-overlay"></canvas>
 
     <!-- 提示语常驻，方便随时确认当前处于草稿纸模式 -->
+    <!-- 动态检测：手写笔正在书写/刚写完(800ms内)显示手写笔模式提示，否则显示通用提示 -->
     <div class="scratch-hint">
-      {{ penAvailable ? '✍️ 已检测到手写笔：仅手写笔可书写' : '在题目上直接书写圈画' }} · 点右上角 × 退出
+      {{ penActive || Date.now() - lastPenTime < 800 ? '✍️ 手写笔模式：仅手写笔可书写' : '在题目上直接书写圈画' }} · 点右上角 × 退出
     </div>
 
     <!-- 真机诊断（默认隐藏，点工具栏「粗细」三下开关）：用于定位事件被哪个分支丢弃 -->
@@ -174,49 +175,11 @@ let lpTimer = null        // 长按橡皮擦图标的定时器
 let lpFired = false       // 长按已触发，忽略随后跟出的 click
 let penActive = false     // 手写笔是否正在书写
 let lastPenTime = 0       // 手写笔最后活动时间（用于笔离开后的短暂防误触）
-let penSeen = false       // 本次草稿是否出现过手写笔（进入"手写笔模式"后手指/手掌不落笔）
-// 该设备是否出现过手写笔（持久化记住：只要检测到笔，之后手指/手掌一律不落笔）
-const PEN_KEY = 'scratch_pen_detected'
-const penAvailable = ref(false)
-try { penAvailable.value = !!localStorage.getItem(PEN_KEY) } catch (err) {}
 
-// 记录"本设备有手写笔"：笔尖落笔或悬停（Apple Pencil 悬停也会触发 pointerType==='pen'）
-function markPenAvailable() {
-  if (!penAvailable.value) {
-    penAvailable.value = true
-    try { localStorage.setItem(PEN_KEY, '1') } catch (err) {}
-  }
-  if (props.visible) enterPenMode()
-}
-
-// 进入手写笔模式：丢弃此前手指/手掌误触留下的笔画
-// （书写时手掌通常先于笔尖接触屏幕，这些"笔画"几乎都是误触）
-function enterPenMode() {
-  penSeen = true
-  if (drawing && current && current.src === 'touch') {
-    drawing = false
-    current = null
-    redraw()
-  }
-  const now = Date.now()
-  const kept = strokes.value.filter((s) => !(s.src === 'touch' && now - (s.t0 || 0) < 2000))
-  if (kept.length !== strokes.value.length) {
-    strokes.value = kept
-    redraw()
-  }
-  clearOverlay()
-}
-
-// 是否应忽略这根手指（设备存在手写笔 → 只有手写笔能书写，手指与手掌一律不落笔）
+// 是否应忽略这根手指（手写笔刚用完的短暂间隔内，忽略手指/手掌触摸防止误触）
 function shouldIgnoreTouch(e) {
   if (e.pointerType !== 'touch') return false
-  if (penAvailable.value || penSeen) return true
   return penActive || Date.now() - lastPenTime < 800
-}
-
-// 全局探测手写笔：即使没在草稿里，只要出现过笔尖（落笔或悬停）就记住这台设备有笔
-function onGlobalPenEvent(e) {
-  if (e.pointerType === 'pen') markPenAvailable()
 }
 
 // 草稿打开时：除草稿遮罩与计算器浮窗外的元素一律不接收指针/点击事件。
@@ -354,8 +317,6 @@ function onPointerDown(e) {
   // 新的一笔下笔即视为上一笔已结束：取消延迟收笔并把上一笔正常入库，再开始新的一笔
   if (current) commitCurrent()
   if (e.pointerType === 'pen') {
-    // 笔尖出现：记住本设备有手写笔，进入手写笔模式（丢掉先前手指/手掌的误触笔画）
-    markPenAvailable()
     penActive = true
     lastPenTime = Date.now()
   }
@@ -434,7 +395,6 @@ function onPointerMove(e) {
       commitCurrent()
       // 用当前这个 move 点作为新笔起点（pointerdown 可能被 Safari 跳过了）
       if (e.pointerType === 'pen') {
-        markPenAvailable()
         penActive = true
         lastPenTime = Date.now()
       }
@@ -456,7 +416,6 @@ function onPointerMove(e) {
     // pointerdown 被 Safari 跳过了，但我们收到了 move——直接开始新笔画
     diag.moveNoDown++
     if (e.pointerType === 'pen') {
-      markPenAvailable()
       penActive = true
       lastPenTime = Date.now()
     }
@@ -673,10 +632,8 @@ watch(() => props.visible, async (v) => {
     clearOverlay()
     return
   }
-  // 每次重新打开草稿：重置"本次会话"的手写笔状态；
-  // 若本设备已检测到过手写笔（penAvailable），手指从一开始就不落笔
+  // 每次重新打开草稿：重置手写笔状态（动态检测，本次会话内 penActive 为 false 时手指可书写）
   penActive = false
-  penSeen = false
   lastPenTime = 0
   await nextTick()
   setupCanvas()
@@ -691,7 +648,6 @@ watch(() => props.questionKey, () => {
   erasingObject = false
   // 重置手写笔状态：新题默认允许手指书写，出现手写笔后再进入防误触模式
   penActive = false
-  penSeen = false
   lastPenTime = 0
   if (props.visible) nextTick(() => { setupCanvas(); clearOverlay() })
 })
@@ -708,9 +664,9 @@ function onResize() {
 
 onMounted(() => {
   window.addEventListener('resize', onResize)
-  // 全局探测手写笔（落笔 / 悬停都算），并在一开始就拦掉草稿外的指针与选中事件
-  window.addEventListener('pointerdown', onGlobalPenEvent, true)
-  window.addEventListener('pointerover', onGlobalPenEvent, true)
+  // 清理旧版残留：手写笔检测不再持久化，纯动态（pendingPenDetected 也清掉）
+  try { localStorage.removeItem('scratch_pen_detected') } catch (err) {}
+  // 草稿打开时：捕获阶段拦掉草稿遮罩外的指针与选中事件（防止手写笔拖画时选中底层文字弹出系统菜单）
   for (const type of ['pointerdown', 'click', 'dblclick', 'selectstart', 'contextmenu']) {
     document.addEventListener(type, globalGuard, true)
   }
@@ -719,8 +675,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', onResize)
-  window.removeEventListener('pointerdown', onGlobalPenEvent, true)
-  window.removeEventListener('pointerover', onGlobalPenEvent, true)
   for (const type of ['pointerdown', 'click', 'dblclick', 'selectstart', 'contextmenu']) {
     document.removeEventListener(type, globalGuard, true)
   }

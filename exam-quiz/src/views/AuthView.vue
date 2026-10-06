@@ -1,5 +1,8 @@
-﻿<template>
+<template>
   <div class="auth-page">
+    <!-- 从解析/知识点扩展页跳转来的，左上角显示返回按钮 -->
+    <div class="auth-back" v-if="showBack" @click="goBackResult">← 返回</div>
+
     <div class="auth-header">
       <h1>工考通·岩土</h1>
       <p class="subtitle">登录后可跨设备同步刷题进度</p>
@@ -162,19 +165,33 @@
         <p class="tip">
           {{ mode === 'login' ? '还没有账号？点上方"注册"' : '已有账号？点上方"登录"' }}
         </p>
+
+        <div class="divider">或</div>
+
+        <button class="guest-btn" @click="enterGuest">
+          🚶 {{ showBack ? '以游客身份继续' : '以游客身份登录' }}
+        </button>
+        <p class="guest-tip">游客模式仅保存在本设备，无法查看解析与知识点扩展</p>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { signIn, signUp, resetPassword, isValidPhone, checkOtherDeviceOnline, markMySessionOnline, supabase } from '../utils/supabase'
 import { syncFromCloud, pushAllToCloud } from '../utils/storage'
-import { setLoginState } from '../main'
+import { setLoginState, setGuestState } from '../main'
 
 const router = useRouter()
+const route = useRoute()
+
+// 当带有 from=result 参数或 sessionStorage 里有来源 URL 时，显示返回按钮
+const showBack = computed(() => {
+  return route.query.from === 'result' || !!sessionStorage.getItem('auth_return_to')
+})
+
 const mode = ref('login') // login | register | forgot | reset
 const phone = ref('')
 const email = ref('')
@@ -204,17 +221,35 @@ function goLogin() {
   errorMsg.value = ''
 }
 
+function goBackResult() {
+  const returnTo = sessionStorage.getItem('auth_return_to')
+  sessionStorage.removeItem('auth_return_to')
+  if (returnTo) {
+    router.replace(returnTo)
+  } else {
+    router.replace('/')
+  }
+}
+
+function enterGuest() {
+  setGuestState(true)
+  const returnTo = sessionStorage.getItem('auth_return_to')
+  if (returnTo) {
+    sessionStorage.removeItem('auth_return_to')
+    router.replace(returnTo)
+  } else {
+    router.replace('/')
+  }
+}
+
 // 页面加载时，检查是否是从重置邮件链接跳过来的
 onMounted(async () => {
-  // 先让 Supabase 处理 hash 里的 token（隐式流程）
   await supabase.auth.getSession()
   
-  // 从 hash 里提取 code 参数（因为用的是 hash 路由，参数都在 # 后面）
   const hash = window.location.hash
   let code = null
   let type = null
   
-  // 尝试从 hash 里解析参数
   if (hash.includes('code=')) {
     const hashParts = hash.split('?')
     if (hashParts.length > 1) {
@@ -226,25 +261,19 @@ onMounted(async () => {
   
   if (code) {
     try {
-      // 交换 code 获取 session
       const { error } = await supabase.auth.exchangeCodeForSession(code)
       if (error) throw error
       mode.value = 'reset'
-      // 清空 URL 里的参数
       window.history.replaceState(null, '', window.location.pathname + '#/auth')
     } catch (err) {
       errorMsg.value = '链接已失效，请重新申请重置'
       mode.value = 'login'
     }
   } else {
-    // 检查是否已经有 session（隐式流程，从 hash 自动登录了）
     const { data: { session } } = await supabase.auth.getSession()
     if (session?.user) {
-      // 有 session，检查是不是重置密码过来的
-      // Supabase 隐式流程会在 hash 里带 type=recovery
       if (hash.includes('type=recovery')) {
         mode.value = 'reset'
-        // 清空 URL 里的参数
         window.history.replaceState(null, '', window.location.pathname + '#/auth')
       }
     }
@@ -285,12 +314,17 @@ function isValidEmail(email) {
 
 // 登录成功后跳回上次退出的页面
 function redirectAfterLogin() {
+  const returnTo = sessionStorage.getItem('auth_return_to')
+  if (returnTo) {
+    sessionStorage.removeItem('auth_return_to')
+    router.replace(returnTo)
+    return
+  }
   const lastPath = localStorage.getItem('quiz_last_path')
-  // 首次登录或没有记录，跳首页
-  if (!lastPath || lastPath === '/' || lastPath.startsWith('/auth')) {
-    router.push('/')
+  if (lastPath && lastPath !== '/' && !lastPath.startsWith('/auth')) {
+    router.replace(lastPath)
   } else {
-    router.push(lastPath)
+    router.replace('/')
   }
 }
 
@@ -373,6 +407,17 @@ async function submit() {
   margin: 0 auto;
   padding: 40px 20px;
   min-height: 100vh;
+}
+
+/* 从做题页/解析页跳转来时，左上角显示返回按钮 */
+.auth-back {
+  margin-bottom: 12px;
+  color: #4a90d9;
+  font-size: 14px;
+  cursor: pointer;
+}
+.auth-back:hover {
+  text-decoration: underline;
 }
 
 .auth-header {
@@ -495,6 +540,54 @@ async function submit() {
   color: #aaa;
   font-size: 13px;
   margin-top: 16px;
+}
+
+/* 分隔线 "或" */
+.divider {
+  position: relative;
+  margin: 20px 0 12px;
+  text-align: center;
+  font-size: 12px;
+  color: #ccc;
+}
+.divider::before,
+.divider::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 40%;
+  height: 1px;
+  background: #eee;
+}
+.divider::before { left: 0; }
+.divider::after { right: 0; }
+
+/* 游客登录按钮 */
+.guest-btn {
+  width: 100%;
+  padding: 12px;
+  background: #f5f5f5;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  color: #666;
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.guest-btn:hover {
+  background: #e6f7ff;
+  color: #1890ff;
+  border-color: #1890ff;
+}
+
+.guest-tip {
+  text-align: center;
+  color: #bbb;
+  font-size: 12px;
+  margin-top: 8px;
+  margin-bottom: 0;
 }
 
 /* 注册成功提示 */

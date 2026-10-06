@@ -22,7 +22,12 @@
 
         <div class="analysis-section">
           <div class="analysis-title">答案解析</div>
-          <div class="analysis-content" v-html="renderedAnalysis"></div>
+          <!-- 正常显示解析 -->
+          <div class="analysis-content" v-if="!isGuest" v-html="renderedAnalysis"></div>
+          <!-- 游客模式：解析替换为登录提示 -->
+          <div class="guest-analysis-tip" v-else>
+            <p>游客模式无法查看解析，如需查看答案解析请 <span class="login-link" @click="goLogin">登录</span>。</p>
+          </div>
         </div>
       </div>
 
@@ -30,10 +35,10 @@
         <div class="footer-btns">
           <button
             class="knowledge-btn"
-            :class="{ disabled: !hasKnowledge }"
-            :disabled="!hasKnowledge"
-            :title="hasKnowledge ? '查看本题考查的知识点扩展' : '该题暂无知识点扩展'"
-            @click="showKnowledge = true"
+            :class="{ disabled: !canOpenKnowledge }"
+            :disabled="!canOpenKnowledge"
+            :title="knowledgeBtnTitle"
+            @click="openKnowledge"
           >
             知识点扩展
           </button>
@@ -59,17 +64,21 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import katex from 'katex'
 import knowledgeExt from '../data/knowledgeExt.json'
+
+const router = useRouter()
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
   question: { type: Object, required: true },
   userAnswer: { type: String, default: '' },
-  isLast: { type: Boolean, default: false }
+  isLast: { type: Boolean, default: false },
+  isGuest: { type: Boolean, default: false }
 })
 
-defineEmits(['close', 'next'])
+const emit = defineEmits(['close', 'next'])
 
 const showKnowledge = ref(false)
 
@@ -86,7 +95,32 @@ const knowledgeHtml = computed(() => {
 })
 const hasKnowledge = computed(() => !!knowledgeHtml.value)
 
+// 能否打开知识点扩展：游客或无内容时不可
+const canOpenKnowledge = computed(() => !props.isGuest && hasKnowledge.value)
+
+const knowledgeBtnTitle = computed(() => {
+  if (props.isGuest) return '游客模式无法查看知识点扩展，请先登录'
+  if (!hasKnowledge.value) return '该题暂无知识点扩展'
+  return '查看本题考查的知识点扩展'
+})
+
 const renderedKnowledge = computed(() => renderLatex(knowledgeHtml.value))
+
+function openKnowledge() {
+  if (props.isGuest) {
+    alert('游客模式无法查看知识点扩展，请先登录')
+    return
+  }
+  showKnowledge.value = true
+}
+
+function goLogin() {
+  // 记录当前做题页作为来源，登录成功/游客继续时跳回来
+  // 同时带 from=result query 参数让 AuthView 显示顶部「← 返回」按钮
+  sessionStorage.setItem('auth_return_to', router.currentRoute.value.fullPath)
+  emit('close')
+  router.push({ path: '/auth', query: { from: 'result' } })
+}
 
 function renderLatex(text) {
   if (!text) return ''
@@ -269,6 +303,25 @@ const renderedAnalysis = computed(() => {
   color: #bbb;
   border-color: #e0e0e0;
   cursor: not-allowed;
+}
+
+/* 游客模式登录提示 */
+.guest-analysis-tip {
+  font-size: 14px;
+  line-height: 1.8;
+  color: #888;
+  padding: 12px;
+  background: #f5f7ff;
+  border-radius: 8px;
+  text-align: center;
+}
+.guest-analysis-tip p {
+  margin: 0;
+}
+.guest-analysis-tip .login-link {
+  color: #4a90d9;
+  cursor: pointer;
+  text-decoration: underline;
 }
 
 /* 知识点扩展弹窗 */
