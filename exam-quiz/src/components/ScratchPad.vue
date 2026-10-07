@@ -67,6 +67,7 @@
         <span class="bar-sep"></span>
         <button class="tool-btn" title="撤销" :disabled="strokes.length === 0" @click="undo">↶</button>
         <button class="tool-btn" title="清空" :disabled="strokes.length === 0" @click="clearAll">🗑</button>
+        <button class="tool-btn calc-launch" title="计算器" @click="$emit('open-calculator')">🧮</button>
       </div>
       <div class="bar-row">
         <span class="bar-label">粗细</span>
@@ -109,7 +110,7 @@ const props = defineProps({
   questionKey: { type: [String, Number], default: '' }
 })
 
-defineEmits(['close'])
+defineEmits(['close', 'open-calculator'])
 
 const canvasEl = ref(null)
 const overlayEl = ref(null)

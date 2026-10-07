@@ -83,6 +83,11 @@ body.scratch-open .calc-float,
 body.calc-open .calc-float {
   pointer-events: auto;
 }
+/* 计算器打开时：草稿纸遮罩一并屏蔽，计算器以外区域均不可点击
+   （此规则在 scratch-open 之后声明，同特异性下覆盖，保证两者同时打开时草稿纸被禁用） */
+body.calc-open .scratch-mask {
+  pointer-events: none;
+}
 
 /* 草稿纸 / 计算器打开时禁止整页选中与长按菜单 */
 body.scratch-open,
