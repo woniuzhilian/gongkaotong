@@ -1435,6 +1435,8 @@ exam-quiz/zoom.py
 /missing_questions/
 /unmatched_images/
 /_move_backup/
+/_fb_pages/
+/*.sql
 /*.json
 /*.txt
 /*.tsv

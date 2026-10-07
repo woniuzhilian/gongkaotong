@@ -28,13 +28,42 @@
       </button>
       <div class="success" v-if="success">密码修改成功，下次登录请使用新密码</div>
     </div>
+
+    <div class="security-card email-card">
+      <h3 class="card-title">修改绑定邮箱</h3>
+      <p class="card-tip">为保障账号安全，需完整输入原邮箱与密码，验证通过后方可绑定新邮箱。</p>
+
+      <div class="field">
+        <label>原邮箱</label>
+        <input v-model="oldEmail" type="email" placeholder="请输入当前绑定的完整邮箱" autocomplete="email" />
+      </div>
+      <div class="field">
+        <label>密码</label>
+        <input v-model="pwd" type="password" placeholder="请输入账号密码" autocomplete="current-password" />
+      </div>
+      <div class="field">
+        <label>新邮箱</label>
+        <input v-model="newEmail" type="email" placeholder="请输入要绑定的新邮箱" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label>确认新邮箱</label>
+        <input v-model="confirmEmail" type="email" placeholder="请再次输入新邮箱" autocomplete="off" />
+      </div>
+
+      <div class="error" v-if="emailError">{{ emailError }}</div>
+
+      <button class="submit-btn" :disabled="emailLoading" @click="submitEmail">
+        {{ emailLoading ? '提交中...' : '确认修改' }}
+      </button>
+      <div class="success" v-if="emailSuccess">绑定邮箱修改成功，重置密码邮件将发送到新邮箱</div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { changePassword } from '../utils/supabase'
+import { changePassword, changeEmail } from '../utils/supabase'
 
 const router = useRouter()
 const oldPwd = ref('')
@@ -43,6 +72,19 @@ const confirmPwd = ref('')
 const error = ref('')
 const success = ref(false)
 const loading = ref(false)
+
+// 修改绑定邮箱
+const oldEmail = ref('')
+const pwd = ref('')
+const newEmail = ref('')
+const confirmEmail = ref('')
+const emailError = ref('')
+const emailSuccess = ref(false)
+const emailLoading = ref(false)
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+}
 
 function goBack() {
   // 用户中心入口只在首页，返回即回首页（不依赖历史栈）
@@ -67,6 +109,47 @@ async function submit() {
     error.value = e.message || '修改失败，请重试'
   } finally {
     loading.value = false
+  }
+}
+
+// 修改绑定邮箱
+async function submitEmail() {
+  emailError.value = ''
+  emailSuccess.value = false
+
+  if (!isValidEmail(oldEmail.value)) {
+    emailError.value = '请输入正确的原邮箱地址'
+    return
+  }
+  if (!pwd.value) {
+    emailError.value = '请输入密码'
+    return
+  }
+  if (!isValidEmail(newEmail.value)) {
+    emailError.value = '请输入正确的新邮箱地址'
+    return
+  }
+  if (newEmail.value !== confirmEmail.value) {
+    emailError.value = '两次输入的新邮箱不一致'
+    return
+  }
+  if (newEmail.value.toLowerCase() === oldEmail.value.toLowerCase()) {
+    emailError.value = '新邮箱不能与原邮箱相同'
+    return
+  }
+
+  emailLoading.value = true
+  try {
+    await changeEmail(oldEmail.value.trim(), pwd.value, newEmail.value.trim())
+    emailSuccess.value = true
+    oldEmail.value = ''
+    pwd.value = ''
+    newEmail.value = ''
+    confirmEmail.value = ''
+  } catch (e) {
+    emailError.value = e.message || '修改失败，请重试'
+  } finally {
+    emailLoading.value = false
   }
 }
 </script>
@@ -115,6 +198,17 @@ async function submit() {
   margin: 0 0 16px;
   font-size: 16px;
   color: #333;
+}
+
+.card-tip {
+  margin: 0 0 14px;
+  font-size: 12px;
+  color: #999;
+  line-height: 1.6;
+}
+
+.email-card {
+  margin-top: 16px;
 }
 
 .field {

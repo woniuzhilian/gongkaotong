@@ -82,6 +82,26 @@ export async function changePassword(oldPassword, newPassword) {
   }
 }
 
+// 修改绑定邮箱（安全中心）：需完整输入原邮箱 + 密码做重认证，通过后绑定新邮箱
+export async function changeEmail(oldEmail, password, newEmail) {
+  const user = await getCurrentUser()
+  if (!user) throw new Error('请先登录')
+  // 1. 原邮箱 + 密码重新登录，验证身份
+  const { error: reErr } = await supabase.auth.signInWithPassword({
+    email: oldEmail,
+    password
+  })
+  if (reErr) throw new Error('原邮箱或密码不正确')
+  // 2. 绑定新邮箱
+  const { error } = await supabase.auth.updateUser({ email: newEmail })
+  if (error) {
+    const msg = String(error.message).toLowerCase()
+    if (msg.includes('already') || msg.includes('registered')) throw new Error('该邮箱已被其他账号使用')
+    if (msg.includes('confirm')) throw new Error('系统已向新邮箱发送确认邮件，请点击邮件中的链接完成绑定')
+    throw error
+  }
+}
+
 // 登出
 export async function signOut() {
   const { error } = await supabase.auth.signOut()
@@ -323,7 +343,7 @@ export async function clearMySession() {
 }
 // ===== 用户反馈 =====
 // 提交题目反馈
-export async function submitFeedback(questionId, feedbackParts, feedbackText) {
+export async function submitFeedback(questionId, feedbackParts, feedbackText, bigSubject) {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session?.user) throw new Error('请先登录')
 
@@ -332,6 +352,7 @@ export async function submitFeedback(questionId, feedbackParts, feedbackText) {
     .insert({
       user_id: session.user.id,
       question_id: questionId,
+      big_subject: bigSubject || null,
       feedback: JSON.stringify({
         parts: feedbackParts,
         text: feedbackText || ''
@@ -339,4 +360,64 @@ export async function submitFeedback(questionId, feedbackParts, feedbackText) {
     })
 
   if (error) throw error
+}
+
+// ===== 消息中心 =====
+// 获取当前用户的消息列表（新消息在前）
+export async function fetchMessages() {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user) throw new Error('请先登录')
+  const { data, error } = await supabase
+    .from('messages')
+    .select('id, title, content, is_read, created_at')
+    .eq('user_id', session.user.id)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+// 获取未读消息数量
+export async function fetchUnreadCount() {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user) return 0
+  const { count, error } = await supabase
+    .from('messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', session.user.id)
+    .eq('is_read', false)
+  if (error) return 0
+  return count || 0
+}
+
+// 标记消息已读
+export async function markMessageRead(messageId) {
+  const { error } = await supabase
+    .from('messages')
+    .update({ is_read: true })
+    .eq('id', messageId)
+  if (error) throw error
+}
+
+// ===== 意见建议 =====
+// 提交意见建议
+export async function submitSuggestion(content) {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user) throw new Error('请先登录')
+  const { error } = await supabase
+    .from('suggestions')
+    .insert({ user_id: session.user.id, content })
+  if (error) throw error
+}
+
+// 获取当前用户提交过的意见建议（新提交在前）
+export async function fetchSuggestions() {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user) throw new Error('请先登录')
+  const { data, error } = await supabase
+    .from('suggestions')
+    .select('id, content, status, created_at')
+    .eq('user_id', session.user.id)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data || []
 }

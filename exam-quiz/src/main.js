@@ -16,6 +16,8 @@ const routes = [
   { path: '/favorites', component: () => import('./views/FavoritesView.vue') },
   { path: '/changelog', component: () => import('./views/ChangelogView.vue') },
   { path: '/security', component: () => import('./views/SecurityView.vue') },
+  { path: '/messages', component: () => import('./views/MessagesView.vue') },
+  { path: '/suggestions', component: () => import('./views/SuggestionsView.vue') },
   { path: '/result', component: () => import('./views/ResultView.vue') }
 ]
 

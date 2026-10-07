@@ -46,9 +46,18 @@ export function getYears(bigSubject) {
   return result
 }
 
-// 按小科目获取题目（保持原顺序）
+// 按小科目获取题目（按年份+题号升序，补考年份紧随正考之后）
 export function getQuestionsBySmallSubject(bigSubject, smallSubject) {
-  return getQuestionsByBigSubject(bigSubject).filter(q => q.smallSubject === smallSubject)
+  const list = getQuestionsByBigSubject(bigSubject).filter(q => q.smallSubject === smallSubject)
+  return list.slice().sort((a, b) => {
+    const ay = parseInt(a.year, 10)
+    const by = parseInt(b.year, 10)
+    if (ay !== by) return ay - by
+    const ab = a.year.includes('补') ? 1 : 0
+    const bb = b.year.includes('补') ? 1 : 0
+    if (ab !== bb) return ab - bb
+    return (a.yearQnum || 0) - (b.yearQnum || 0)
+  })
 }
 
 // 按年份获取题目（保持原顺序）

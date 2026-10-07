@@ -10,6 +10,10 @@
       <div class="user-center" v-else ref="centerEl">
         <button class="center-btn" @click="showCenterMenu = !showCenterMenu">👤 用户中心</button>
         <div class="center-menu" v-if="showCenterMenu" @click="showCenterMenu = false">
+          <button class="center-item" @click="goMessages">
+            📬 消息<span class="unread-badge" v-if="unreadCount > 0">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
+          </button>
+          <button class="center-item" @click="goSuggestions">💬 意见建议</button>
           <button class="center-item" @click="goSecurity">🔒 安全中心</button>
           <button class="center-item danger" @click="logout">退出登录</button>
         </div>
@@ -44,7 +48,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { getCurrentUser, signOut, onAuthStateChange, subscribeToProgress, unsubscribeProgress, getMySessionId, markMySessionOnline, clearMySession } from './utils/supabase'
+import { getCurrentUser, signOut, onAuthStateChange, subscribeToProgress, unsubscribeProgress, getMySessionId, markMySessionOnline, clearMySession, fetchUnreadCount } from './utils/supabase'
 import { clearLocalData, syncFromCloud, getProgress } from './utils/storage'
 import { setLoginState, setGuestState, guestState } from './main'
 import { isMuted, toggleMuted } from './utils/sound'
@@ -57,6 +61,15 @@ const currentRoute = ref('/')
 // ===== 用户中心下拉菜单 =====
 const showCenterMenu = ref(false)
 const centerEl = ref(null)
+const unreadCount = ref(0)
+
+async function refreshUnreadCount() {
+  try {
+    unreadCount.value = await fetchUnreadCount()
+  } catch (e) {
+    unreadCount.value = 0
+  }
+}
 
 function onDocClickCloseMenu(e) {
   if (showCenterMenu.value && centerEl.value && !centerEl.value.contains(e.target)) {
@@ -67,6 +80,16 @@ function onDocClickCloseMenu(e) {
 function goSecurity() {
   showCenterMenu.value = false
   router.push('/security')
+}
+
+function goMessages() {
+  showCenterMenu.value = false
+  router.push('/messages')
+}
+
+function goSuggestions() {
+  showCenterMenu.value = false
+  router.push('/suggestions')
 }
 
 // ===== 音效开关 =====
@@ -146,6 +169,7 @@ onMounted(async () => {
     userPhone.value = user.phone
     await markMySessionOnline()
     subscribeToProgress(user.userId, handleRemoteUpdate)
+    refreshUnreadCount()
   }
   // 游客状态由 main.js 的 guestState (reactive) 响应式提供，无需这里恢复
 
@@ -155,10 +179,15 @@ onMounted(async () => {
       // 登录了就自动退出游客模式
       setGuestState(false)
       subscribeToProgress(u.userId, handleRemoteUpdate)
+      refreshUnreadCount()
     } else {
       unsubscribeProgress()
+      unreadCount.value = 0
     }
   })
+
+  // 从消息页返回首页时刷新未读数
+  window.addEventListener('refresh-unread', refreshUnreadCount)
 
   // 监听路由变化
   router.afterEach((to) => {
@@ -174,6 +203,7 @@ onMounted(async () => {
 onUnmounted(() => {
   unsubscribeProgress()
   window.removeEventListener('sw-update-available', onUpdateAvailable)
+  window.removeEventListener('refresh-unread', refreshUnreadCount)
   document.removeEventListener('touchstart', onSwipeStart)
   document.removeEventListener('touchend', onSwipeEnd)
   document.removeEventListener('click', onDocClickCloseMenu, true)
@@ -357,6 +387,23 @@ async function logout() {
   border-radius: 6px;
   cursor: pointer;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.unread-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #ff4d4f;
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+  box-sizing: border-box;
 }
 
 .center-item:hover {

@@ -155,6 +155,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { submitFeedback } from '../utils/supabase'
+import { showToast } from '../utils/toast'
 import ScratchPad from './ScratchPad.vue'
 import Calculator from './Calculator.vue'
 import katex from 'katex'
@@ -223,7 +224,7 @@ async function submitReport() {
       reportText.value,
       q.bigSubject || null
     )
-    alert('反馈提交成功，感谢您的帮助！')
+    showToast('反馈提交成功，感谢您的帮助！', 1000)
     showReportModal.value = false
     selectedParts.value = []
     reportText.value = ''

@@ -16,6 +16,11 @@
         <span class="big-subject">{{ bigSubject }}</span>
         <span class="divider">|</span>
         <span class="section">{{ section }}</span>
+        <!-- 按年份刷题时，顶部中间追加当前题的小科目名称 -->
+        <template v-if="mode === 'year' && currentQuestion">
+          <span class="divider">|</span>
+          <span class="section small-subject">{{ currentQuestion.smallSubject }}</span>
+        </template>
       </div>
       <div class="header-right">
         <button class="nav-button redo-btn" @click="redoSection">
@@ -451,6 +456,19 @@ function goHome() {
   text-align: center;
   font-size: 14px;
   color: #666;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.small-subject {
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .big-subject {
