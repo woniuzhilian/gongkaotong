@@ -50,7 +50,7 @@ async function initAuth() {
 }
 
 // 路由守卫：未登录且非游客跳转到 /auth
-router.beforeEach(async (to) => {
+router.beforeEach(async (to, from) => {
   // 等待初始化完成
   if (!authReady) {
     await initAuth()
@@ -67,6 +67,12 @@ router.beforeEach(async (to) => {
   // 记录用户访问的页面（用于登录后跳回上次位置）
   if (!to.meta.public) {
     localStorage.setItem('quiz_last_path', to.fullPath)
+  }
+  // 记录进入错题本之前的来源页：错题本「返回上一步」用它精确返回。
+  // 避免“错题本→练习→结果页→返回错题本→再返回”时又绕回结果页。
+  // 从 /wrongbook、/quiz、/result 自身进入时不覆盖，保留最初的来源页
+  if (to.path === '/wrongbook' && !['/wrongbook', '/quiz', '/result'].includes(from.path)) {
+    try { sessionStorage.setItem('wrongbook_return_to', from.fullPath) } catch (e) {}
   }
   return true
 })

@@ -68,6 +68,15 @@ const selectedBigSubject = ref('公共基础')
 const wrongBook = ref({ '公共基础': [], '专业基础': [] })
 
 function goBack() {
+  // 优先回到进入错题本之前记录的来源页：用 replace 跳转并清除记录，
+  // 避免历史栈里残留 /result 导致“返回上一步”又绕回结果页
+  let returnTo = null
+  try { returnTo = sessionStorage.getItem('wrongbook_return_to') } catch (e) {}
+  if (returnTo) {
+    try { sessionStorage.removeItem('wrongbook_return_to') } catch (e) {}
+    router.replace(returnTo)
+    return
+  }
   if (window.history.length > 1) {
     router.back()
   } else {
@@ -301,7 +310,7 @@ function clearAll() {
 }
 
 .item-question {
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.7;
   color: #333;
   margin-bottom: 8px;
@@ -312,7 +321,7 @@ function clearAll() {
 }
 
 .item-answer {
-  font-size: 13px;
+  font-size: 15px;
   color: #666;
 }
 

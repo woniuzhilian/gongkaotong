@@ -16,8 +16,8 @@
         <span class="big-subject">{{ bigSubject }}</span>
         <span class="divider">|</span>
         <span class="section">{{ section }}</span>
-        <!-- 按年份刷题时，顶部中间追加当前题的小科目名称 -->
-        <template v-if="mode === 'year' && currentQuestion">
+        <!-- 按年份 / 错题本 / 收藏夹刷题时，顶部中间追加当前题的小科目名称 -->
+        <template v-if="(mode === 'year' || mode === 'wrong' || mode === 'fav') && currentQuestion">
           <span class="divider">|</span>
           <span class="section small-subject">{{ currentQuestion.smallSubject }}</span>
         </template>
@@ -80,8 +80,11 @@
       :user-answer="selectedAnswer"
       :is-last="currentIndex === questions.length - 1"
       :is-guest="isGuest"
+      :big-subject="bigSubject"
+      :is-in-wrong="currentIsWrong"
       @close="closeModal"
       @next="handleNext"
+      @remove-wrong="handleRemoveWrong"
     />
 
     <!-- 选题弹窗 -->
@@ -130,10 +133,12 @@ import {
 import {
   getSectionProgress, setProgress, clearSectionProgress,
   saveAnswer, getSectionAnswers, clearSectionAnswers,
-  addWrong, getWrongBook, getFavorites, isFavorite, toggleFavorite
+  addWrong, getWrongBook, getFavorites, isFavorite, toggleFavorite,
+  isWrong, removeWrong
 } from '../utils/storage'
 import { guestState } from '../main'
 import { playCorrect, playWrong } from '../utils/sound'
+import { showToast } from '../utils/toast'
 
 const route = useRoute()
 const router = useRouter()
@@ -177,6 +182,22 @@ function toggleCurrentFavorite() {
   favTick.value++
 }
 
+// 当前题是否在错题本（wrongTick 用于移除后触发重算，模式同 favTick）
+const wrongTick = ref(0)
+const currentIsWrong = computed(() => {
+  wrongTick.value
+  if (!currentQuestion.value) return false
+  return isWrong(bigSubject.value, currentQuestion.value.id)
+})
+
+// 结果弹窗「移出错题本」：从错题本删除本题，刷新状态并轻提示
+function handleRemoveWrong() {
+  if (!currentQuestion.value) return
+  removeWrong(bigSubject.value, currentQuestion.value.id)
+  wrongTick.value++
+  showToast('已移出错题本')
+}
+
 onMounted(() => {
   loadQuestions()
   // 其他设备更新了收藏/错题等数据时，刷新当前题的收藏状态
@@ -206,6 +227,7 @@ function onKeyNav(e) {
 
 function onCloudUpdate() {
   favTick.value++
+  wrongTick.value++
 }
 
 watch(() => route.query, () => {

@@ -20,7 +20,14 @@ html, body {
 
 /* KaTeX 公式样式调整 */
 .katex {
-  font-size: 1.05em;
+  font-size: 18px;
+}
+
+/* 上标/下标/分式内字母逐级缩小（KaTeX 的 .sizing 类：0.7em→0.5em 逐级递减），
+   设置最小字号下限防止过小看不清，如 (1-x)^(k/x) 上标内的 k/x；
+   公式整体放大、题干正文不受影响 */
+.katex .sizing {
+  font-size: max(0.7em, 15px) !important;
 }
 
 .katex-display {

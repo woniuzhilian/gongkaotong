@@ -674,7 +674,7 @@ function onZoomTouchEnd(e) {
   }
   .option-btn {
     padding: 12px;
-    font-size: 14px;
+    font-size: 15px;
   }
   /* 手机竖屏：「我不会」宽度为「提交」的 1/3 */
   .submit-area {

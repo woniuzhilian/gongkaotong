@@ -310,7 +310,7 @@ function clearAll() {
 }
 
 .item-question {
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.7;
   color: #333;
   margin-bottom: 8px;

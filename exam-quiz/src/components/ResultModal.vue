@@ -5,6 +5,14 @@
         <span class="result-tag" :class="isCorrect ? 'correct' : 'wrong'">
           {{ isCorrect ? '回答正确' : '回答错误' }}
         </span>
+        <button
+          v-if="showRemoveWrong"
+          class="remove-wrong-btn"
+          :disabled="removed"
+          @click="onRemoveWrong"
+        >
+          {{ removed ? '已移出' : '移出错题本' }}
+        </button>
         <button class="close-btn" @click="$emit('close')">&times;</button>
       </div>
 
@@ -75,15 +83,30 @@ const props = defineProps({
   question: { type: Object, required: true },
   userAnswer: { type: String, default: '' },
   isLast: { type: Boolean, default: false },
-  isGuest: { type: Boolean, default: false }
+  isGuest: { type: Boolean, default: false },
+  bigSubject: { type: String, default: '' },
+  isInWrong: { type: Boolean, default: false }
 })
 
-const emit = defineEmits(['close', 'next'])
+const emit = defineEmits(['close', 'next', 'remove-wrong'])
 
 const showKnowledge = ref(false)
+// 本题是否已在本弹窗内执行过「移出错题本」
+const removed = ref(false)
+// 仅当本题在错题本中时显示按钮；移除后短暂保留「已移出」禁用态作反馈
+const showRemoveWrong = computed(() => props.isInWrong || removed.value)
 
-// 切题时自动关闭知识点弹窗
-watch(() => props.question, () => { showKnowledge.value = false })
+// 切题时自动关闭知识点弹窗，并重置移除状态
+watch(() => props.question, () => {
+  showKnowledge.value = false
+  removed.value = false
+})
+
+function onRemoveWrong() {
+  if (removed.value) return
+  removed.value = true
+  emit('remove-wrong')
+}
 
 const isCorrect = computed(() => props.userAnswer === props.question.answer)
 
@@ -210,6 +233,31 @@ const renderedAnalysis = computed(() => {
   color: #333;
 }
 
+/* 头部中部「移出错题本」按钮：错题本主题的描边小胶囊，与现有按钮风格一致 */
+.remove-wrong-btn {
+  background: #fff2f0;
+  color: #ff4d4f;
+  border: 1px solid #ffccc7;
+  border-radius: 14px;
+  font-size: 12px;
+  padding: 3px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.remove-wrong-btn:hover:not(:disabled) {
+  background: #ff4d4f;
+  color: #fff;
+}
+
+.remove-wrong-btn:disabled {
+  background: #f5f5f5;
+  color: #bbb;
+  border-color: #e0e0e0;
+  cursor: default;
+}
+
 .modal-body {
   padding: 20px;
   flex: 1;
@@ -254,7 +302,7 @@ const renderedAnalysis = computed(() => {
 }
 
 .analysis-content {
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.8;
   color: #555;
   word-break: break-word;
@@ -364,7 +412,7 @@ const renderedAnalysis = computed(() => {
 .knowledge-body {
   padding: 18px 20px;
   overflow-y: auto;
-  font-size: 14.5px;
+  font-size: 15px;
   line-height: 1.8;
   color: #444;
   word-break: break-word;
@@ -374,7 +422,7 @@ const renderedAnalysis = computed(() => {
   border-collapse: collapse;
   width: 100%;
   margin: 10px 0;
-  font-size: 13.5px;
+  font-size: 15px;
 }
 
 .knowledge-body :deep(td), .knowledge-body :deep(th) {
@@ -424,6 +472,10 @@ const renderedAnalysis = computed(() => {
   }
   .modal-body {
     padding: 16px;
+  }
+  .remove-wrong-btn {
+    font-size: 11px;
+    padding: 2px 10px;
   }
 }
 </style>
