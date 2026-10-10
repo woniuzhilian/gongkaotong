@@ -17,13 +17,14 @@
       <button class="calc-close" title="关闭计算器" @click.stop="$emit('close')">×</button>
     </div>
 
-    <!-- 显示区：算式（带闪烁光标，方程等号为绿色；^ 后内容渲染为上标，5^2 → 5²）-->
+    <!-- 显示区：算式（带闪烁光标，方程等号为绿色；^ 后内容渲染为上标，5^2 → 5²）；
+         点击算式任意位置可定位光标到该处 -->
     <div class="calc-display">
-      <div class="calc-expr" ref="exprEl">
+      <div class="calc-expr" ref="exprEl" @click="onExprClick">
         <template v-for="it in renderItems" :key="it.key">
           <span v-if="it.type === 'caret'" class="calc-caret"></span>
-          <span v-else-if="it.sup" class="calc-sup">{{ it.ch }}</span>
-          <span v-else :class="{ 'eq-mark': it.eq, 'x-mark': it.isX }">{{ it.ch }}</span>
+          <span v-else-if="it.sup" class="calc-sup" :data-idx="it.idx">{{ it.ch }}</span>
+          <span v-else :data-idx="it.idx" :class="{ 'eq-mark': it.eq, 'x-mark': it.isX }">{{ it.ch }}</span>
         </template>
         <span v-if="cursor >= expr.length" class="calc-caret"></span>
         <span v-if="!expr" class="calc-ph">输入算式或方程</span>
@@ -76,9 +77,9 @@
           <p><b>对数</b>：<span class="hl">log</span> 常用对数（以 10 为底）；<span class="hl">ln</span> 自然对数（以 e 为底）</p>
           <p><b>π 和 𝑥</b>：<span class="hl">π</span> 插入圆周率；<span class="hl">𝑥</span> 插入变量 𝑥（解方程时使用）</p>
           <p><b>Ans 键</b>：调取上一次计算结果，如刚算出 5，按 <span class="hl">Ans + 3 =</span> 得 8</p>
-          <p><b>光标编辑</b>：<span class="hl">← →</span> 移动光标，<span class="hl">DEL</span> 删光标前一位，数字和函数插入到光标处</p>
+          <p><b>光标编辑</b>：<span class="hl">← →</span> 或<b>直接点击算式</b>定位光标，<span class="hl">DEL</span> 删光标前一位，数字和函数插入到光标处</p>
           <p><b>解方程</b>：<span class="hl">Eq.=</span> 输入等号（绿色显示），如 <span class="hl">x Eq.= 2</span>，再按 <span class="hl">SOLVE</span> 得 <span class="hl">x = 2</span></p>
-          <p><b>清空</b>：<span class="hl">AC</span> 全清；刚算完一道题按运算符会用上一次结果继续算</p>
+          <p><b>清空</b>：只有按 <span class="hl">AC</span> 才全清；按 <span class="hl">=</span> 出结果后算式仍保留，可直接继续按键或点光标修改</p>
           <p><b>隐藏计算器</b>：<b>按住「🙈 隐藏」按钮</b>临时隐藏整个计算器（底层做题页面完全露出），松手恢复原位，不影响计算结果</p>
         </div>
         <button class="calc-help-close" @click="helpOpen = false">知道了</button>
@@ -225,7 +226,6 @@ const expr = ref('')
 const cursor = ref(0)          // 光标位置（0 ~ expr.length）
 const result = ref('0')
 const ans = ref(NaN)           // 上一次运算/求解结果（Ans 键调取）
-const justEvaluated = ref(false) // 刚按过 = / SOLVE：再输入数字则开新式子
 let lastPressAt = 0             // 按键防重入：pointerdown 快速连按时防双触发
 const helpOpen = ref(false)     // 使用说明弹窗
 // 把算式拆成"显示项"：^ 后有幂内容则隐藏 ^、幂用上标渲染（5^2 → 5²）；
@@ -256,17 +256,17 @@ const renderItems = computed(() => {
         // 有幂内容 → 隐藏 ^，幂用上标渲染
         for (let k = start; k < i; k++) {
           if (k === cur) items.push({ key: 'c', type: 'caret' })
-          items.push({ key: k, type: 'char', sup: true, ch: s[k] })
+          items.push({ key: k, type: 'char', sup: true, ch: s[k], idx: k })
         }
       } else {
         // ^ 后无幂内容 → 显示 ^ 本身，让用户知道按到了
-        items.push({ key: caretIdx, type: 'char', sup: false, ch: '^' })
+        items.push({ key: caretIdx, type: 'char', sup: false, ch: '^', idx: caretIdx })
       }
       continue
     }
     if (i === cur) items.push({ key: 'c', type: 'caret' })
     const ch = s[i]
-    items.push({ key: i, type: 'char', sup: false, ch, eq: ch === '=', isX: ch === 'x' || ch === '\u{1D465}' })
+    items.push({ key: i, type: 'char', sup: false, ch, idx: i, eq: ch === '=', isX: ch === 'x' || ch === '\u{1D465}' })
     i++
   }
   if (cur >= s.length) items.push({ key: 'c', type: 'caret' })
@@ -280,7 +280,6 @@ function resetAll() {
   cursor.value = 0
   result.value = '0'
   ans.value = NaN
-  justEvaluated.value = false
 }
 
 // 光标跟随：算式行自动滚动到能看见光标的位置
@@ -292,6 +291,31 @@ async function keepCursorInView() {
   const left = caret.offsetLeft
   if (left < el.scrollLeft) el.scrollLeft = left
   else if (left > el.scrollLeft + el.clientWidth - 10) el.scrollLeft = left - el.clientWidth + 10
+}
+
+// 点击算式显示区：按点击位置落到最近的字符间隙定位光标（=SOLVE 后同样生效）
+async function onExprClick(e) {
+  const el = exprEl.value
+  if (!el) return
+  await nextTick()
+  const rect = el.getBoundingClientRect()
+  // 点击位置换算到内容坐标（含横向滚动偏移）
+  const clickX = (e.clientX - rect.left) + el.scrollLeft
+  let bestIdx = expr.value.length
+  let bestDist = Infinity
+  el.querySelectorAll('span[data-idx]').forEach(span => {
+    const r = span.getBoundingClientRect()
+    const left = (r.left - rect.left) + el.scrollLeft
+    const right = left + r.width
+    const idx = Number(span.dataset.idx)
+    // 候选位置：该字符之前（left）与该字符之后（right）
+    const dBefore = Math.abs(clickX - left)
+    const dAfter = Math.abs(clickX - right)
+    if (dBefore < bestDist) { bestDist = dBefore; bestIdx = idx }
+    if (dAfter < bestDist) { bestDist = dAfter; bestIdx = idx + 1 }
+  })
+  cursor.value = Math.max(0, Math.min(bestIdx, expr.value.length))
+  keepCursorInView()
 }
 
 // ===== 编辑（插入到光标处 / 删除 / 移动光标）=====
@@ -307,7 +331,6 @@ function moveCursor(d) {
 }
 
 function backspace() {
-  if (justEvaluated.value) { resetAll(); return }
   if (cursor.value <= 0) return
   expr.value = expr.value.slice(0, cursor.value - 1) + expr.value.slice(cursor.value)
   cursor.value--
@@ -378,15 +401,8 @@ const keys = [
   { t: '0' }, { t: '.' }, { t: 'Ans', ans: 1 }, { t: '+', op: 1 }, { t: '=', eq: 1 }
 ]
 
-// 按 = / SOLVE 之后的输入行为（卡西欧习惯）：
-// 运算符 → 以上次结果（Ans）继续；数字/函数/π/x/Ans → 清空旧式子开新算式
-function applyAfterEval(isOp) {
-  if (!justEvaluated.value) return
-  justEvaluated.value = false
-  expr.value = isOp && isFinite(ans.value) ? fmt(ans.value) : ''
-  cursor.value = expr.value.length
-}
-
+// 按键行为：= / SOLVE 之后算式保留，数字/运算符/函数都直接插入光标处继续编辑；
+// 只有按 AC 才清空整道算式（点击算式或用 ← → 可移动光标修改）
 function press(k) {
   // 防重入：pointerdown 在某些设备上可能被同时派发多次（touch+pen），
   // 或 iOS Safari 快速连按时 pointerdown + click 都触发
@@ -398,7 +414,6 @@ function press(k) {
   if (k.eq) { doEval(); return }
   if (k.solve) { doSolve(); return }
   if (k.move) { moveCursor(k.move); return }
-  applyAfterEval(!!k.op)
   if (k.eqIn) { insertAtCursor('='); return }
   if (k.sq) { insertAtCursor('^2'); return }
   if (k.ans) { insertAtCursor(isFinite(ans.value) ? fmt(ans.value) : '0'); return }
@@ -428,7 +443,6 @@ function doEval() {
     if (typeof v !== 'number' || isNaN(v)) { result.value = '格式错误'; return }
     result.value = fmt(v)
     if (isFinite(v)) ans.value = v
-    justEvaluated.value = true
   } catch (err) {
     result.value = '格式错误'
   }
@@ -494,7 +508,6 @@ function finishSolve(x) {
   const v = Math.round(x * 1e8) / 1e8
   result.value = 'x ≈ ' + fmt(v)
   ans.value = v
-  justEvaluated.value = true
 }
 
 // ===== 电脑端键盘输入：打开计算器后可直接用键盘敲算式 =====

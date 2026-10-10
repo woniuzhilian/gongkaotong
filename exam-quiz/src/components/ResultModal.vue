@@ -1,7 +1,7 @@
 <template>
   <div v-if="visible" class="modal-overlay" @click.self="$emit('close')">
-    <div class="modal-content">
-      <div class="modal-header">
+    <div class="modal-content" ref="modalContentEl" :style="dragStyle">
+      <div class="modal-header" @pointerdown="startDrag">
         <span class="result-tag" :class="isCorrect ? 'correct' : 'wrong'">
           {{ isCorrect ? '回答正确' : '回答错误' }}
         </span>
@@ -89,6 +89,57 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'next', 'remove-wrong'])
+
+// ===== 桌面（鼠标环境）拖动解析窗：在 header 上按住拖动整个窗口 =====
+// 手机/平板（触屏）不进入拖动逻辑，保持原居中动画
+const modalContentEl = ref(null)
+const dragOffset = ref({ x: 0, y: 0 })
+let dragState = null
+
+const dragStyle = computed(() => ({
+  transform: `translate(${dragOffset.value.x}px, ${dragOffset.value.y}px)`
+}))
+
+function startDrag(e) {
+  // 仅鼠标按下才允许拖动；触屏环境（pointerType=touch/pen）保持现状不可拖动
+  if (e.pointerType && e.pointerType !== 'mouse') return
+  if (e.button !== 0) return
+  if (e.target.closest('.close-btn')) return
+  const el = modalContentEl.value
+  if (!el) return
+  e.preventDefault()
+  const rect = el.getBoundingClientRect()
+  dragState = {
+    id: e.pointerId,
+    sx: e.clientX, sy: e.clientY,
+    baseLeft: rect.left, baseTop: rect.top
+  }
+  window.addEventListener('pointermove', onDragMove)
+  window.addEventListener('pointerup', endDrag)
+  window.addEventListener('pointercancel', endDrag)
+}
+
+function onDragMove(e) {
+  if (!dragState || e.pointerId !== dragState.id) return
+  const el = modalContentEl.value
+  if (!el) return
+  // 限制在视口内：至少露出标题栏与部分内容，避免拖丢
+  const visLeft = Math.min(Math.max(dragState.baseLeft + e.clientX - dragState.sx, 0), window.innerWidth - 80)
+  const visTop = Math.min(Math.max(dragState.baseTop + e.clientY - dragState.sy, 0), window.innerHeight - 60)
+  dragOffset.value = { x: visLeft - dragState.baseLeft, y: visTop - dragState.baseTop }
+}
+
+function endDrag(e) {
+  if (dragState && (!e || e.pointerId === dragState.id)) dragState = null
+  window.removeEventListener('pointermove', onDragMove)
+  window.removeEventListener('pointerup', endDrag)
+  window.removeEventListener('pointercancel', endDrag)
+}
+
+// 弹窗重新打开时复位位置
+watch(() => props.visible, (v) => {
+  if (v) dragOffset.value = { x: 0, y: 0 }
+})
 
 const showKnowledge = ref(false)
 // 本题是否已在本弹窗内执行过「移出错题本」
@@ -201,6 +252,15 @@ const renderedAnalysis = computed(() => {
   align-items: center;
   padding: 16px 20px;
   border-bottom: 1px solid #f0f0f0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* 仅桌面鼠标环境：header 提示可拖动 */
+@media (hover: hover) and (pointer: fine) {
+  .modal-header {
+    cursor: move;
+  }
 }
 
 .result-tag {
@@ -233,14 +293,16 @@ const renderedAnalysis = computed(() => {
   color: #333;
 }
 
-/* 头部中部「移出错题本」按钮：错题本主题的描边小胶囊，与现有按钮风格一致 */
+/* 头部中部「移出错题本」按钮：错题本主题的描边胶囊；
+   字号/字重与左侧「回答正确/错误」标签统一（18px bold） */
 .remove-wrong-btn {
   background: #fff2f0;
   color: #ff4d4f;
   border: 1px solid #ffccc7;
-  border-radius: 14px;
-  font-size: 12px;
-  padding: 3px 12px;
+  border-radius: 20px;
+  font-size: 18px;
+  font-weight: bold;
+  padding: 4px 12px;
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.2s;
@@ -472,10 +534,6 @@ const renderedAnalysis = computed(() => {
   }
   .modal-body {
     padding: 16px;
-  }
-  .remove-wrong-btn {
-    font-size: 11px;
-    padding: 2px 10px;
   }
 }
 </style>

@@ -68,12 +68,9 @@ const selectedBigSubject = ref('公共基础')
 const favBook = ref({ '公共基础': [], '专业基础': [] })
 const refreshTick = ref(0)
 
+// 「返回上一步」：收藏夹主页的上一级 = 首页，确定性回首页（不依赖历史栈）
 function goBack() {
-  if (window.history.length > 1) {
-    router.back()
-  } else {
-    router.push('/')
-  }
+  router.replace('/')
 }
 
 function goHome() {

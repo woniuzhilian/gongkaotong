@@ -182,18 +182,16 @@ function removeCorrectFromFav() {
   }
 }
 
-// 返回：错题本/收藏夹练习回到各自的列表页（用 back 弹回历史栈中已有的那一层，
-// 使列表页的“返回上一步”能继续回到进入列表页前的首页）；套题回到首页第三步
+// 「返回」：= 点击上一级菜单按钮（确定性跳转，不依赖历史栈）：
+// 错题本结果页 → 错题本主页；收藏夹结果页 → 收藏夹主页；
+// 按小科目/按年份结果页 → 回首页第三步（保留 quiz_home_state，HomeView 自动恢复）
 function goBack() {
-  if (mode.value === 'wrong' || mode.value === 'fav') {
-    if (window.history.length > 1) {
-      router.back()
-    } else {
-      router.push(mode.value === 'wrong' ? '/wrongbook' : '/favorites')
-    }
+  if (mode.value === 'wrong') {
+    router.replace('/wrongbook')
+  } else if (mode.value === 'fav') {
+    router.replace('/favorites')
   } else {
-    // 保留 quiz_home_state，回到首页第三步
-    router.push('/')
+    router.replace('/')
   }
 }
 </script>

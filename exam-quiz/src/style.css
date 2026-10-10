@@ -81,8 +81,7 @@ button:active {
 /* 草稿纸打开时：底层页面不再接收指针事件
    （防止 iPad 手写笔/手掌穿透触发「上一题」等按钮导致断笔）；
    草稿遮罩与计算器浮窗重新开启 pointer-events，保证可用 */
-body.scratch-open .quiz-page,
-body.calc-open .quiz-page {
+body.scratch-open .quiz-page {
   pointer-events: none;
 }
 body.scratch-open .scratch-mask,
@@ -96,10 +95,25 @@ body.calc-open .scratch-mask {
   pointer-events: none;
 }
 
-/* 草稿纸 / 计算器打开时禁止整页选中与长按菜单 */
-body.scratch-open,
-body.calc-open {
+/* 计算器打开屏蔽下层按钮：仅触屏设备（手机/平板）生效，防止误触；
+   桌面鼠标环境不屏蔽，可边用计算器边点选下层题目/选项 */
+@media (hover: none), (pointer: coarse) {
+  body.calc-open .quiz-page {
+    pointer-events: none;
+  }
+}
+
+/* 草稿纸打开时禁止整页选中与长按菜单（全设备，手掌误触保护）；
+   计算器打开时同理仅触屏设备生效，桌面放开文本选中 */
+body.scratch-open {
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
+}
+@media (hover: none), (pointer: coarse) {
+  body.calc-open {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
 }

@@ -71,7 +71,17 @@ async function refreshUnreadCount() {
   }
 }
 
+// 右滑手势完成后吞掉随后手指抬起合成的那次 click：
+// 否则首页第三步右滑回上一级时，抬手点可能落在 item-card 上触发 startQuiz 跳进做题页
+let suppressSwipeClick = false
+
 function onDocClickCloseMenu(e) {
+  if (suppressSwipeClick) {
+    suppressSwipeClick = false
+    e.stopPropagation()
+    e.preventDefault()
+    return
+  }
   if (showCenterMenu.value && centerEl.value && !centerEl.value.contains(e.target)) {
     showCenterMenu.value = false
   }
@@ -246,42 +256,46 @@ function onSwipeEnd(e) {
   const dt = Date.now() - swipeStartTime
   // 以水平为主且动作较快
   if (Math.abs(dx) <= 80 || Math.abs(dx) <= Math.abs(dy) * 1.5 || dt >= 500) return
-  if (swipeDir === 'right') goBackLevel()
-  else if (swipeDir === 'left') goLastQuiz()
+  if (swipeDir === 'right') {
+    goBackLevel()
+    // 右滑手势已成立：吞掉抬手时合成的那次 click（step1 右滑无导航时吞掉还能防止误选科目卡片）
+    suppressSwipeClick = true
+    setTimeout(() => { suppressSwipeClick = false }, 1000)
+  } else if (swipeDir === 'left') goLastQuiz()
 }
 
 function swipeBlocked() {
   if (showUpdate.value) return true
   // 有弹窗/图片放大遮罩/草稿/计算器时不触发滑动导航
-  if (document.querySelector('.img-zoom-mask, .report-mask, .picker-mask, .update-mask, .analysis-mask, .scratch-mask, .calc-float.open')) return true
+  // .modal-overlay = 答案解析弹窗（ResultModal，含其内嵌的知识点扩展弹窗）；
+  // 弹窗打开时屏蔽边缘滑动，避免右滑把用户直接踢出做题页
+  if (document.querySelector('.img-zoom-mask, .report-mask, .picker-mask, .update-mask, .modal-overlay, .scratch-mask, .calc-float.open')) return true
   return false
 }
 
+// 右滑 = 点击页面上的「返回上一步/返回」按钮 = 返回上一级菜单（不依赖历史栈，确定性 replace）：
+// /quiz mode=wrong → /wrongbook；mode=fav → /favorites；mode=smallSubject/year → /（首页恢复 step3）
+// /result 同上表（wrong→/wrongbook、fav→/favorites、其他→/）
+// /wrongbook /favorites → /；首页 / 三步由 HomeView 处理（step1 无动作）；其余页面 → /
 function goBackLevel() {
   if (swipeBlocked()) return
-  // 结果页：错题本/收藏夹用 sessionStorage 记录的来源精确跳回；套题/小科目 replace('/') 回首页
-  if (currentRoute.value === '/result') {
-    const returnTo = sessionStorage.getItem('quiz_return_to')
-    if (returnTo) {
-      sessionStorage.removeItem('quiz_return_to')
-      router.replace(returnTo)
-    } else {
-      router.replace('/')
-    }
+  const path = currentRoute.value
+  if (path === '/quiz' || path === '/result') {
+    const m = router.currentRoute.value.query.mode
+    if (m === 'wrong') router.replace('/wrongbook')
+    else if (m === 'fav') router.replace('/favorites')
+    else router.replace('/')
     return
   }
-  // 错题本/收藏夹：replace('/') 回首页（首页有 quiz_home_state 记住第几步）
-  // 不用 router.back()，历史栈可能混有 /auth 等无关条目
-  if (currentRoute.value === '/wrongbook' || currentRoute.value === '/favorites') {
+  if (path === '/wrongbook' || path === '/favorites') {
     router.replace('/')
     return
   }
-  // 首页三个步骤都在 / 路由内，右滑 = 返回上一步（由 HomeView 处理）
-  if (currentRoute.value === '/') {
+  if (path === '/') {
     window.dispatchEvent(new CustomEvent('app-swipe-back'))
     return
   }
-  // 其他页面：安全起见也 replace('/') 兜底，不依赖历史栈
+  // /changelog /security /messages /suggestions /auth 等其余页面 → 回首页
   router.replace('/')
 }
 

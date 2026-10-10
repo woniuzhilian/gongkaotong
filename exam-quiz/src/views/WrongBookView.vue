@@ -67,21 +67,9 @@ const router = useRouter()
 const selectedBigSubject = ref('公共基础')
 const wrongBook = ref({ '公共基础': [], '专业基础': [] })
 
+// 「返回上一步」：错题本主页的上一级 = 首页，确定性回首页（不依赖历史栈）
 function goBack() {
-  // 优先回到进入错题本之前记录的来源页：用 replace 跳转并清除记录，
-  // 避免历史栈里残留 /result 导致“返回上一步”又绕回结果页
-  let returnTo = null
-  try { returnTo = sessionStorage.getItem('wrongbook_return_to') } catch (e) {}
-  if (returnTo) {
-    try { sessionStorage.removeItem('wrongbook_return_to') } catch (e) {}
-    router.replace(returnTo)
-    return
-  }
-  if (window.history.length > 1) {
-    router.back()
-  } else {
-    router.push('/')
-  }
+  router.replace('/')
 }
 
 function goHome() {

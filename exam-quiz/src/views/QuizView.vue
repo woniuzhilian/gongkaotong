@@ -81,7 +81,7 @@
       :is-last="currentIndex === questions.length - 1"
       :is-guest="isGuest"
       :big-subject="bigSubject"
-      :is-in-wrong="currentIsWrong"
+      :is-in-wrong="mode === 'wrong' && currentIsWrong"
       @close="closeModal"
       @next="handleNext"
       @remove-wrong="handleRemoveWrong"
@@ -405,11 +405,16 @@ function redoSection() {
   }
 }
 
+// 「返回上一步」= 返回上一级菜单（确定性跳转，不依赖历史栈）：
+// 错题本做题页 → 错题本主页；收藏夹做题页 → 收藏夹主页；
+// 按小科目/按年份做题页 → 回首页第三步（quiz_home_state 自动恢复选中的大科目与模式）
 function goBack() {
-  if (window.history.length > 1) {
-    router.back()
+  if (mode.value === 'wrong') {
+    router.replace('/wrongbook')
+  } else if (mode.value === 'fav') {
+    router.replace('/favorites')
   } else {
-    router.push('/')
+    router.replace('/')
   }
 }
 
@@ -799,8 +804,17 @@ function goHome() {
     font-size: 11px;
     padding: 6px 4px;
   }
+  /* 手机竖屏：顶部标题一行放不下时允许换行成最多两行显示并保持居中 */
   .quiz-info {
     font-size: 12px;
+    white-space: normal;
+    overflow: visible;
+    flex-wrap: wrap;
+  }
+  .small-subject {
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
   }
   .header-left,
   .header-right {

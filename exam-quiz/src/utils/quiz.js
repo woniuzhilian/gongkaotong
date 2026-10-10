@@ -60,9 +60,10 @@ export function getQuestionsBySmallSubject(bigSubject, smallSubject) {
   })
 }
 
-// 按年份获取题目（保持原顺序）
+// 按年份获取题目（按题号升序）
 export function getQuestionsByYear(bigSubject, year) {
-  return getQuestionsByBigSubject(bigSubject).filter(q => q.year === year)
+  const list = getQuestionsByBigSubject(bigSubject).filter(q => q.year === year)
+  return list.slice().sort((a, b) => (parseInt(a.yearQnum, 10) || 0) - (parseInt(b.yearQnum, 10) || 0))
 }
 
 // 按id列表获取题目（用于错题本）
