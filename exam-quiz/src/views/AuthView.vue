@@ -184,6 +184,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { signIn, signUp, resetPassword, isValidPhone, checkOtherDeviceOnline, markMySessionOnline, supabase } from '../utils/supabase'
 import { syncFromCloud, pushAllToCloud } from '../utils/storage'
 import { setLoginState, setGuestState } from '../main'
+import { showToast } from '../utils/toast'
 
 const router = useRouter()
 const route = useRoute()
@@ -204,6 +205,11 @@ const registered = ref(false)
 const resetSent = ref(false)
 
 function switchMode(m) {
+  // 新用户注册功能暂未开放：点击注册 tab 时提示，不切换模式
+  if (m === 'register') {
+    showToast('此功能暂未开放', 1500)
+    return
+  }
   mode.value = m
   errorMsg.value = ''
 }
@@ -233,14 +239,9 @@ function goBackResult() {
 }
 
 function enterGuest() {
-  setGuestState(true)
-  const returnTo = sessionStorage.getItem('auth_return_to')
-  if (returnTo) {
-    sessionStorage.removeItem('auth_return_to')
-    router.replace(returnTo)
-  } else {
-    router.replace('/')
-  }
+  // 游客登录功能暂未开放：点击时提示，不进入游客模式
+  showToast('此功能暂未开放', 1500)
+  return
 }
 
 // 页面加载时，检查是否是从重置邮件链接跳过来的
@@ -357,6 +358,12 @@ async function sendResetEmail() {
 
 async function submit() {
   errorMsg.value = ''
+
+  // 新用户注册功能暂未开放：兜底拦截，不调用注册接口
+  if (mode.value === 'register') {
+    showToast('此功能暂未开放', 1500)
+    return
+  }
 
   if (!isValidPhone(phone.value)) {
     errorMsg.value = '请输入正确的11位手机号'
