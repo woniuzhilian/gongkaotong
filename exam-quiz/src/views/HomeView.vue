@@ -8,7 +8,7 @@
 
     <div class="header">
       <img class="logo-img" src="/logo.png" alt="注考易" />
-      <h1>注考易</h1>
+      <h1>www.zhukaoyi.com</h1>
       <p class="subtitle">公共基础 + 岩土专业基础 · 历年真题</p>
     </div>
 
@@ -358,9 +358,10 @@ function goHome() {
 }
 
 .header h1 {
-  font-size: 26px;
+  font-size: 20px;
   color: #333;
   margin: 0 0 8px;
+  font-weight: 600;
 }
 
 .subtitle {
@@ -607,7 +608,7 @@ function goHome() {
 
 @media (max-width: 600px) {
   .header h1 {
-    font-size: 22px;
+    font-size: 17px;
   }
   .subject-cards, .mode-cards {
     gap: 10px;
