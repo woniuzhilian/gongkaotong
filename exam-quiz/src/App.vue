@@ -10,6 +10,7 @@
       <div class="user-center" v-else ref="centerEl">
         <button class="center-btn" @click="showCenterMenu = !showCenterMenu">👤 用户中心</button>
         <div class="center-menu" v-if="showCenterMenu" @click="showCenterMenu = false">
+          <div class="center-user">📱 {{ userPhone }}</div>
           <button class="center-item" @click="goMessages">
             📬 消息<span class="unread-badge" v-if="unreadCount > 0">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
           </button>
@@ -48,7 +49,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { getCurrentUser, signOut, onAuthStateChange, subscribeToProgress, unsubscribeProgress, getMySessionId, markMySessionOnline, clearMySession, fetchUnreadCount } from './utils/supabase'
+import { getCurrentUser, signOut, onAuthStateChange, subscribeToProgress, unsubscribeProgress, getMySessionId, markMySessionOnline, clearMySession, fetchUnreadCount, supabase } from './utils/supabase'
 import { clearLocalData, syncFromCloud, getProgress } from './utils/storage'
 import { setLoginState, setGuestState, guestState } from './main'
 import { isMuted, toggleMuted } from './utils/sound'
@@ -62,6 +63,8 @@ const currentRoute = ref('/')
 const showCenterMenu = ref(false)
 const centerEl = ref(null)
 const unreadCount = ref(0)
+// 重置密码 recovery 会话监听器（onMounted 注册，onUnmounted 清理）
+let authListener = null
 
 async function refreshUnreadCount() {
   try {
@@ -123,10 +126,25 @@ async function loadChangelog() {
   }
 }
 
-function onUpdateAvailable() {
-  const v = updateInfo.value.version || 'unknown'
+// 按 changelog.json 版本号判断：与本地已看记录不同则弹窗
+// （不依赖 Service Worker 更新事件，SW 文件不变时也能正常提示）
+function checkVersionUpdate() {
+  const v = updateInfo.value.version
+  if (!v || v === 'unknown') return
   if (localStorage.getItem(SEEN_KEY) === v) return
   showUpdate.value = true
+}
+
+function onUpdateAvailable() {
+  checkVersionUpdate()
+}
+
+// 页面重新可见时再查一次更新：用户在别处更新发布后，切回本页即可收到提示
+const onVisible = async () => {
+  if (document.visibilityState === 'visible') {
+    await loadChangelog()
+    checkVersionUpdate()
+  }
 }
 
 async function dismissUpdate() {
@@ -166,9 +184,19 @@ async function forceLogout() {
 onMounted(async () => {
   currentRoute.value = router.currentRoute.value.path
 
-  // 更新提示：先拉更新日志，再检查是否已有待激活的新版本
+  // 更新提示：先拉更新日志，再按版本号判断是否弹窗（不依赖 SW 事件）
   await loadChangelog()
+  checkVersionUpdate()
+  document.addEventListener('visibilitychange', onVisible)
   window.addEventListener('sw-update-available', onUpdateAvailable)
+
+  // 重置密码链接检测：用户点击邮件链接进入应用时，Supabase 会建立 recovery 会话
+  // （事件 PASSWORD_RECOVERY）。此时无论当前落在哪个路由，都跳转到设置新密码页。
+  authListener = supabase.auth.onAuthStateChange((event, session) => {
+    if (event === 'PASSWORD_RECOVERY' && session?.user) {
+      router.push({ path: '/auth', query: { mode: 'reset' } })
+    }
+  })
   try {
     const reg = await navigator.serviceWorker.getRegistration()
     if (reg && reg.waiting) onUpdateAvailable()
@@ -212,6 +240,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
   unsubscribeProgress()
+  if (authListener?.data?.subscription) authListener.data.subscription.unsubscribe()
+  document.removeEventListener('visibilitychange', onVisible)
   window.removeEventListener('sw-update-available', onUpdateAvailable)
   window.removeEventListener('refresh-unread', refreshUnreadCount)
   document.removeEventListener('touchstart', onSwipeStart)
@@ -389,6 +419,21 @@ async function logout() {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+.center-user {
+  font-size: 14px;
+  font-weight: 600;
+  color: #4a90d9;
+  padding: 8px 10px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 2px;
+  user-select: none;
+  white-space: nowrap;
 }
 
 .center-item {

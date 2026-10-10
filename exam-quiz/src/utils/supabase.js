@@ -57,9 +57,12 @@ export async function signIn(phone, password) {
 }
 
 // 忘记密码：发送重置邮件
+// redirectTo 用站点根（不带 /auth 路径）：应用是 hash 路由，
+// Supabase 会把 token 拼到该地址的 hash 上（形如 站点根#access_token=...&type=recovery），
+// 由 App.vue 全局监听 PASSWORD_RECOVERY 跳转到设置新密码页。
 export async function resetPassword(email) {
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: 'https://gongkaotong.pages.dev/auth'
+    redirectTo: window.location.origin + window.location.pathname
   })
   if (error) throw error
 }

@@ -79,7 +79,7 @@
           <p><b>Ans 键</b>：调取上一次计算结果，如刚算出 5，按 <span class="hl">Ans + 3 =</span> 得 8</p>
           <p><b>光标编辑</b>：<span class="hl">← →</span> 或<b>直接点击算式</b>定位光标，<span class="hl">DEL</span> 删光标前一位，数字和函数插入到光标处</p>
           <p><b>解方程</b>：<span class="hl">Eq.=</span> 输入等号（绿色显示），如 <span class="hl">x Eq.= 2</span>，再按 <span class="hl">SOLVE</span> 得 <span class="hl">x = 2</span></p>
-          <p><b>清空</b>：只有按 <span class="hl">AC</span> 才全清；按 <span class="hl">=</span> 出结果后算式仍保留，可直接继续按键或点光标修改</p>
+          <p><b>清空</b>：按 <span class="hl">AC</span> 全清；按 <span class="hl">=</span> 或 <span class="hl">SOLVE</span> 出结果后，直接用 <span class="hl">← →</span> 或点击算式定位光标即可在<span class="hl">原式</span>上修改；若未移动光标直接输入数字等，则视为输入<span class="hl">新算式</span>（自动清空上次内容）</p>
           <p><b>隐藏计算器</b>：<b>按住「🙈 隐藏」按钮</b>临时隐藏整个计算器（底层做题页面完全露出），松手恢复原位，不影响计算结果</p>
         </div>
         <button class="calc-help-close" @click="helpOpen = false">知道了</button>
@@ -226,6 +226,7 @@ const expr = ref('')
 const cursor = ref(0)          // 光标位置（0 ~ expr.length）
 const result = ref('0')
 const ans = ref(NaN)           // 上一次运算/求解结果（Ans 键调取）
+const justEvaluated = ref(false) // = / SOLVE 刚出结果：未移动光标直接输入 → 开启新算式；先移动光标 → 修改原式
 let lastPressAt = 0             // 按键防重入：pointerdown 快速连按时防双触发
 const helpOpen = ref(false)     // 使用说明弹窗
 // 把算式拆成"显示项"：^ 后有幂内容则隐藏 ^、幂用上标渲染（5^2 → 5²）；
@@ -280,6 +281,7 @@ function resetAll() {
   cursor.value = 0
   result.value = '0'
   ans.value = NaN
+  justEvaluated.value = false
 }
 
 // 光标跟随：算式行自动滚动到能看见光标的位置
@@ -293,10 +295,12 @@ async function keepCursorInView() {
   else if (left > el.scrollLeft + el.clientWidth - 10) el.scrollLeft = left - el.clientWidth + 10
 }
 
-// 点击算式显示区：按点击位置落到最近的字符间隙定位光标（=SOLVE 后同样生效）
+// 点击算式显示区：按点击位置落到最近的字符间隙定位光标（=SOLVE 后同样生效）；
+// 点击即视为"移动光标修改原式"，退出 justEvaluated 状态
 async function onExprClick(e) {
   const el = exprEl.value
   if (!el) return
+  justEvaluated.value = false
   await nextTick()
   const rect = el.getBoundingClientRect()
   // 点击位置换算到内容坐标（含横向滚动偏移）
@@ -401,8 +405,10 @@ const keys = [
   { t: '0' }, { t: '.' }, { t: 'Ans', ans: 1 }, { t: '+', op: 1 }, { t: '=', eq: 1 }
 ]
 
-// 按键行为：= / SOLVE 之后算式保留，数字/运算符/函数都直接插入光标处继续编辑；
-// 只有按 AC 才清空整道算式（点击算式或用 ← → 可移动光标修改）
+// 按键行为：= / SOLVE 之后——
+//   · 未移动光标直接按数字/运算符/函数等输入键 → 视为输入新算式（清空上次算式与结果，只显示新输入）
+//   · 先用 ← → 或点击算式移动光标 → 视为修改上次算式（在原式上继续编辑）
+// 只有按 AC 才全清
 function press(k) {
   // 防重入：pointerdown 在某些设备上可能被同时派发多次（touch+pen），
   // 或 iOS Safari 快速连按时 pointerdown + click 都触发
@@ -413,11 +419,21 @@ function press(k) {
   if (k.del) { backspace(); return }
   if (k.eq) { doEval(); return }
   if (k.solve) { doSolve(); return }
-  if (k.move) { moveCursor(k.move); return }
-  if (k.eqIn) { insertAtCursor('='); return }
-  if (k.sq) { insertAtCursor('^2'); return }
-  if (k.ans) { insertAtCursor(isFinite(ans.value) ? fmt(ans.value) : '0'); return }
-  insertAtCursor(k.ins || k.t)
+  if (k.move) { justEvaluated.value = false; moveCursor(k.move); return }
+  if (k.eqIn) { startInput('='); return }
+  if (k.sq) { startInput('^2'); return }
+  if (k.ans) { startInput(isFinite(ans.value) ? fmt(ans.value) : '0'); return }
+  startInput(k.ins || k.t)
+}
+
+// 输入类按键统一入口：= / SOLVE 刚出结果且未移动光标时，先清空开启新算式
+function startInput(text) {
+  if (justEvaluated.value) {
+    justEvaluated.value = false
+    expr.value = ''
+    cursor.value = 0
+  }
+  insertAtCursor(text)
 }
 
 // 自动补齐缺失的右括号（√ / sin 等函数键自带左括号，用户常漏右括号）
@@ -443,6 +459,7 @@ function doEval() {
     if (typeof v !== 'number' || isNaN(v)) { result.value = '格式错误'; return }
     result.value = fmt(v)
     if (isFinite(v)) ans.value = v
+    justEvaluated.value = true
   } catch (err) {
     result.value = '格式错误'
   }
@@ -508,6 +525,7 @@ function finishSolve(x) {
   const v = Math.round(x * 1e8) / 1e8
   result.value = 'x ≈ ' + fmt(v)
   ans.value = v
+  justEvaluated.value = true
 }
 
 // ===== 电脑端键盘输入：打开计算器后可直接用键盘敲算式 =====

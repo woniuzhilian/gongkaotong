@@ -4,7 +4,8 @@
     <div class="auth-back" v-if="showBack" @click="goBackResult">← 返回</div>
 
     <div class="auth-header">
-      <h1>工考通·岩土</h1>
+      <img class="logo-img" src="/logo.png" alt="注考易" />
+      <h1>注考易</h1>
       <p class="subtitle">登录后可跨设备同步刷题进度</p>
     </div>
 
@@ -244,6 +245,11 @@ function enterGuest() {
 
 // 页面加载时，检查是否是从重置邮件链接跳过来的
 onMounted(async () => {
+  // 支持 /auth?mode=reset：由 App.vue 的 PASSWORD_RECOVERY 监听跳转而来，直接进入设置新密码页
+  if (route.query.mode === 'reset') {
+    mode.value = 'reset'
+  }
+
   await supabase.auth.getSession()
   
   const hash = window.location.hash
@@ -423,6 +429,13 @@ async function submit() {
 .auth-header {
   text-align: center;
   margin-bottom: 30px;
+}
+
+.auth-header .logo-img {
+  width: 110px;
+  height: 110px;
+  border-radius: 16px;
+  margin-bottom: 10px;
 }
 
 .auth-header h1 {

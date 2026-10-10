@@ -7,7 +7,8 @@
     </div>
 
     <div class="header">
-      <h1>工考通·岩土</h1>
+      <img class="logo-img" src="/logo.png" alt="注考易" />
+      <h1>注考易</h1>
       <p class="subtitle">公共基础 + 岩土专业基础 · 历年真题</p>
     </div>
 
@@ -31,7 +32,7 @@
 
     <!-- 第一步：选择大科目 -->
     <div class="section" v-if="step === 1">
-      <h2 class="section-title">第一步：选择大科目</h2>
+      <h2 class="section-title">选择专业</h2>
       <div class="subject-cards">
         <div
           class="subject-card"
@@ -56,7 +57,7 @@
 
     <!-- 第二步：选择刷题模式 -->
     <div class="section" v-if="step === 2">
-      <h2 class="section-title">第二步：选择刷题模式</h2>
+      <h2 class="section-title">选择刷题模式</h2>
       <div class="mode-cards">
         <div
           class="mode-card"
@@ -64,7 +65,7 @@
           @click="selectMode('smallSubject')"
         >
           <div class="mode-icon">📂</div>
-          <div class="mode-title">按小科目刷题</div>
+          <div class="mode-title">按科目刷题</div>
           <div class="mode-desc">按知识点分类专项练习</div>
         </div>
         <div
@@ -82,7 +83,7 @@
     <!-- 第三步：选择小科目/年份 -->
     <div class="section" v-if="step === 3">
       <h2 class="section-title">
-        第三步：选择{{ selectedMode === 'smallSubject' ? '小科目' : '年份' }}
+        选择{{ selectedMode === 'smallSubject' ? '科目' : '年份' }}
       </h2>
       <div class="item-list">
         <div
@@ -347,6 +348,13 @@ function goHome() {
 .header {
   text-align: center;
   padding: 30px 0 20px;
+}
+
+.logo-img {
+  width: 110px;
+  height: 110px;
+  border-radius: 16px;
+  margin-bottom: 10px;
 }
 
 .header h1 {
